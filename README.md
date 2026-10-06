@@ -1,4 +1,4 @@
-# Lab 4 — Ứng dụng chat LAN với TCP và UDP Multicast
+# Lab 6 — Ứng dụng chat LAN với TCP và UDP Multicast
 
 Ứng dụng Java có giao diện JavaFX cho server và client, nằm trong một project Maven. Server quản lý tài khoản, danh sách online, chat riêng và chuyển file riêng qua TCP. Phòng chung dùng UDP multicast trực tiếp giữa các client; file nhóm được tải bằng kết nối TCP trực tiếp tới người gửi.
 
