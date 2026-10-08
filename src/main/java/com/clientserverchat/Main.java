@@ -1,13 +1,22 @@
+/*
+ * File: Main.java
+ * Vai trò: Điểm vào chung của toàn bộ chương trình.
+ * Mục đích: Đọc tham số dòng lệnh để chọn chạy giao diện server hoặc client.
+ * Phương thức chính:
+ * - main(): chọn vai trò "server" hoặc "client".
+ */
 package com.clientserverchat;
 
 import com.clientserverchat.client.ClientLauncher;
 import com.clientserverchat.server.ServerLauncher;
 import java.util.Arrays;
 
-/** One project and entry point; select the server or client role with the first argument. */
+/** Điểm vào chung; truyền tham số đầu tiên để chọn server hoặc client. */
 public final class Main {
+    /** Không cho tạo object Main vì lớp này chỉ chứa hàm main. */
     private Main() {}
 
+    /** Chạy server nếu tham số là "server", chạy client nếu không truyền hoặc truyền "client". */
     public static void main(String[] args) {
         String role = args.length == 0 ? "client" : args[0];
         String[] applicationArgs = args.length == 0 ? args : Arrays.copyOfRange(args, 1, args.length);

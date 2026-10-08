@@ -1,3 +1,13 @@
+/*
+ * File: ClientView.java
+ * Vai trò: Giao diện client JavaFX.
+ * Mục đích: Dựng màn hình đăng nhập/đăng ký, danh sách online, vùng chat, gửi tin và gửi file.
+ * Phương thức chính:
+ * - createLogin(): tạo form IP/cổng/tài khoản/mật khẩu.
+ * - createChat(): tạo màn hình chat sau khi đăng nhập.
+ * - showConversation()/addBubble(): hiển thị lịch sử tin nhắn.
+ * - groupState()/configureHeader(): cập nhật giao diện phòng multicast.
+ */
 package com.clientserverchat.client.ui;
 
 import com.clientserverchat.client.core.ChatMessage;
@@ -24,8 +34,8 @@ public final class ClientView extends BorderPane {
     final TextField host = new TextField("127.0.0.1");
     final TextField port = new TextField("2005");
     final TextField username = new TextField();
-    final PasswordField password = new PasswordField();
-    final PasswordField confirmPassword = new PasswordField();
+    final TextField password = new TextField();
+    final TextField confirmPassword = new TextField();
     final ToggleButton signIn = new ToggleButton("Đăng nhập");
     final ToggleButton signUp = new ToggleButton("Đăng ký");
     final Button connect = button("Đăng nhập", "primary");
@@ -61,6 +71,7 @@ public final class ClientView extends BorderPane {
     private static final PseudoClass INVALID = PseudoClass.getPseudoClass("invalid");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
 
+    /** Tạo ClientView, dựng sẵn trang login và trang chat rồi hiển thị login trước. */
     public ClientView() {
         getStyleClass().add("app-root");
         messageScroll = new ScrollPane(messages);
@@ -69,6 +80,7 @@ public final class ClientView extends BorderPane {
         showLogin();
     }
 
+    /** Dựng màn hình đăng nhập/đăng ký gồm IP server, cổng TCP, tài khoản và mật khẩu rõ. */
     private Node createLogin() {
         ToggleGroup modes = new ToggleGroup();
         signIn.setToggleGroup(modes);
@@ -190,32 +202,39 @@ public final class ClientView extends BorderPane {
         return page;
     }
 
+    /** Bật/tắt trạng thái đang đăng nhập/đăng ký để khóa form và hiện progress. */
     void showAuthenticationBusy(boolean busy) { authenticationBusy.set(busy); }
+
+    /** Bật/tắt trạng thái đang kiểm tra kết nối server. */
     void showConnectionChecking(boolean busy) { connectionChecking.set(busy); }
 
+    /** Gom các ô nhập ở form login để xóa lỗi/highlight hàng loạt. */
     private List<TextInputControl> authenticationInputs() {
         return List.of(host, port, username, password, confirmPassword);
     }
 
+    /** Xóa thông báo lỗi và bỏ viền đỏ trên toàn bộ input đăng nhập. */
     void clearAuthenticationError() {
         loginError.setText("");
         authenticationInputs().forEach(input -> input.pseudoClassStateChanged(INVALID, false));
     }
 
+    /** Hiển thị lỗi validate đúng ô nhập liệu cần sửa. */
     void showValidationError(Authentication.ValidationException error) {
         clearAuthenticationError();
         TextInputControl input = switch (error.field()) {
-            case HOST -> host;
-            case PORT -> port;
-            case USERNAME -> username;
-            case PASSWORD -> password;
-            case CONFIRMATION -> confirmPassword;
+            case MAY_CHU -> host;
+            case CONG -> port;
+            case TAI_KHOAN -> username;
+            case MAT_KHAU -> password;
+            case NHAP_LAI_MAT_KHAU -> confirmPassword;
         };
         input.pseudoClassStateChanged(INVALID, true);
         loginError.setText(error.getMessage());
         input.requestFocus();
     }
 
+    /** Dựng màn hình chat gồm sidebar người dùng, phòng chung, vùng tin nhắn và composer. */
     private Node createChat() {
         VBox sidebar = new VBox(16);
         sidebar.getStyleClass().add("chat-sidebar");
@@ -235,6 +254,7 @@ public final class ClientView extends BorderPane {
         users.getStyleClass().add("people-list");
         users.setPlaceholder(label("Chưa có ai trực tuyến", "sidebar-muted"));
         users.setCellFactory(ignored -> new ListCell<>() {
+            /** Vẽ từng dòng người dùng online trong sidebar. */
             @Override protected void updateItem(String name, boolean empty) {
                 super.updateItem(name, empty);
                 setText(null);
@@ -297,7 +317,10 @@ public final class ClientView extends BorderPane {
         return page;
     }
 
+    /** Chuyển về trang login. */
     public void showLogin() { setCenter(loginPage); }
+
+    /** Chuyển sang trang chat và hiển thị danh tính người dùng đang đăng nhập. */
     public void showChat(String name, String server) {
         identity.setText(name);
         identityAvatar.setText(initials(name));
@@ -305,6 +328,7 @@ public final class ClientView extends BorderPane {
         setCenter(chatPage);
     }
 
+    /** Vẽ lại toàn bộ lịch sử tin nhắn của cuộc trò chuyện đang chọn. */
     public void showConversation(List<ChatMessage> history) {
         messages.getChildren().clear();
         if (history.isEmpty()) {
@@ -322,6 +346,7 @@ public final class ClientView extends BorderPane {
         javafx.application.Platform.runLater(() -> messageScroll.setVvalue(1));
     }
 
+    /** Thêm một bubble tin nhắn hoặc file vào vùng chat. */
     private void addBubble(ChatMessage item) {
         if ("Hệ thống".equals(item.sender())) {
             Label systemNotice = label(item.content(), "system-notice-bubble");
@@ -358,6 +383,7 @@ public final class ClientView extends BorderPane {
         messages.getChildren().add(row);
     }
 
+    /** Tạo card file trong khung chat, có nút mở file/thư mục cho file nhận được. */
     private Node createFileCard(ChatMessage item) {
         String fileName;
         String filePath = null;
@@ -403,6 +429,7 @@ public final class ClientView extends BorderPane {
         return card;
     }
 
+    /** Mở file đã nhận bằng ứng dụng mặc định của hệ điều hành. */
     private void openFile(String path) {
         try {
             File f = new File(path);
@@ -414,6 +441,7 @@ public final class ClientView extends BorderPane {
         }
     }
 
+    /** Mở thư mục chứa file đã nhận. */
     private void openFolder(String path) {
         try {
             File f = new File(path);
@@ -425,6 +453,7 @@ public final class ClientView extends BorderPane {
         }
     }
 
+    /** Cập nhật trạng thái nút Tham gia/Rời phòng và mô tả phòng multicast. */
     void groupState(boolean joined, boolean busy) {
         groupDescription.setText(busy ? "Đang xử lý…" : joined ? "● Đã tham gia" : "○ Chưa tham gia");
         groupCard.pseudoClassStateChanged(PseudoClass.getPseudoClass("joined"), joined);
@@ -435,6 +464,7 @@ public final class ClientView extends BorderPane {
         leaveGroupHeader.getStyleClass().setAll("button", joined ? "secondary" : "primary");
     }
 
+    /** Cập nhật tiêu đề phòng: phòng chung multicast hoặc chat riêng với người dùng. */
     void configureHeader(boolean isGroup, boolean isJoined, String activeName) {
         if (isGroup) {
             roomTitle.setText("#  Phòng chung");
@@ -457,6 +487,7 @@ public final class ClientView extends BorderPane {
         }
     }
 
+    /** Hiển thị thông báo ngắn dưới vùng chat rồi tự ẩn sau vài giây. */
     void showNotice(String text) {
         notice.setText(text);
         boolean show = !text.isBlank();
@@ -472,20 +503,32 @@ public final class ClientView extends BorderPane {
         }
     }
 
+    /** Mở hộp chọn file để gửi, giới hạn logic kiểm tra kích thước nằm ở core. */
     File chooseFile() {
         FileChooser chooser = new FileChooser();
         chooser.setTitle("Chọn tệp gửi (tối đa 20 MiB)");
         return chooser.showOpenDialog(getScene().getWindow());
     }
 
+    /** Tạo cụm label + control dùng lại cho các ô nhập liệu. */
     private static VBox field(String title, Node input) {
         Label caption = label(title, "field-label");
         caption.setLabelFor(input);
         return new VBox(8, caption, input);
     }
+
+    /** Tạo avatar chữ cái đầu của tên người dùng. */
     private static Label avatar(String name) { return label(initials(name), "avatar"); }
+
+    /** Lấy ký tự đầu tiên của tên để làm avatar, hỗ trợ Unicode. */
     private static String initials(String name) { return name.isEmpty() ? "?" : name.substring(0, name.offsetByCodePoints(0, 1)).toUpperCase(); }
+
+    /** Tạo khoảng co giãn trong HBox. */
     private static Region spacer() { Region space = new Region(); HBox.setHgrow(space, Priority.ALWAYS); return space; }
+
+    /** Tạo Label kèm style class CSS. */
     private static Label label(String text, String style) { Label label = new Label(text); label.getStyleClass().add(style); return label; }
+
+    /** Tạo Button kèm style class CSS. */
     private static Button button(String text, String style) { Button button = new Button(text); button.getStyleClass().add(style); return button; }
 }

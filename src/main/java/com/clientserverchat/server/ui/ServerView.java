@@ -1,3 +1,13 @@
+/*
+ * File: ServerView.java
+ * Vai trò: Giao diện quản lý server.
+ * Mục đích: Dựng màn hình nhập IP/cổng, bảng người dùng, trạng thái server và nhật ký hoạt động.
+ * Phương thức chính:
+ * - setupTable(): tạo các cột bảng tài khoản.
+ * - showUsers(): đổ dữ liệu người dùng lên bảng.
+ * - showRunning(): bật/tắt nút theo trạng thái server.
+ * - appendLog(): thêm dòng nhật ký hoạt động.
+ */
 package com.clientserverchat.server.ui;
 
 import com.clientserverchat.server.core.UserInfo;
@@ -17,16 +27,15 @@ public final class ServerView extends BorderPane {
     final TextField port = new TextField("2005");
     final Button start = button("Khởi động", "primary");
     final Button stop = button("Dừng server", "secondary");
-    final TextField search = new TextField();
-    final CheckBox onlineOnly = new CheckBox("Đang online");
     final TableView<UserInfo> table = new TableView<>();
     final Label status = label("Đã dừng", "badge-neutral");
     final Label notice = label("", "server-notice");
     final TextArea logs = new TextArea();
-    private final Label userCount = label("0 tài khoản · 0 online", "muted");
+    private final Label userCount = label("0 tài khoản", "muted");
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss")
             .withZone(ZoneId.systemDefault());
 
+    /** Dựng toàn bộ layout server: header, form IP/cổng, bảng người dùng và nhật ký. */
     public ServerView() {
         getStyleClass().addAll("app-root", "server-root");
         HBox heading = new HBox(12, label("Quản lý server", "page-title"), spacer(), status);
@@ -41,10 +50,7 @@ public final class ServerView extends BorderPane {
         ip.setOnAction(event -> start.fire());
         port.setOnAction(event -> start.fire());
 
-        search.setPromptText("Tìm tài khoản / IP");
-        search.setPrefWidth(240);
-        HBox tableHeader = new HBox(14, label("Người dùng", "section-title"), userCount,
-                spacer(), search, onlineOnly);
+        HBox tableHeader = new HBox(14, label("Người dùng", "section-title"), userCount, spacer());
         tableHeader.setAlignment(Pos.CENTER_LEFT);
         tableHeader.setPadding(new Insets(16));
         setupTable();
@@ -78,19 +84,18 @@ public final class ServerView extends BorderPane {
         setCenter(content);
     }
 
+    /** Tạo bảng người dùng gồm tài khoản, mật khẩu, IP, giờ vào/ra và trạng thái. */
     private void setupTable() {
         table.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY_FLEX_LAST_COLUMN);
         table.setPlaceholder(label("Không có tài khoản", "muted"));
         column("TÀI KHOẢN", UserInfo::username, 140);
         TableColumn<UserInfo, String> password = column("MẬT KHẨU", UserInfo::passwordDisplay, 170);
         password.setCellFactory(ignored -> new TableCell<>() {
+            /** Hiển thị mật khẩu rõ và tooltip cùng nội dung cho từng dòng. */
             @Override protected void updateItem(String text, boolean empty) {
                 super.updateItem(text, empty);
                 setText(empty ? null : text);
-                boolean unavailable = getTableRow() != null && getTableRow().getItem() != null
-                        && getTableRow().getItem().password() == null;
-                setTooltip(empty ? null : new Tooltip(unavailable
-                        ? "Mật khẩu xuất hiện sau khi người dùng đăng nhập trong phiên chạy này." : text));
+                setTooltip(empty ? null : new Tooltip(text));
             }
         });
         column("ĐỊA CHỈ IP", user -> user.ip().isBlank() ? "—" : user.ip(), 130);
@@ -98,6 +103,7 @@ public final class ServerView extends BorderPane {
         column("ĐĂNG XUẤT", user -> time(user.logoutTime()), 165);
         TableColumn<UserInfo, String> state = column("TRẠNG THÁI", UserInfo::status, 110);
         state.setCellFactory(ignored -> new TableCell<>() {
+            /** Hiển thị trạng thái Online/Offline dưới dạng badge màu. */
             @Override protected void updateItem(String value, boolean empty) {
                 super.updateItem(value, empty);
                 setText(null);
@@ -107,6 +113,7 @@ public final class ServerView extends BorderPane {
         });
     }
 
+    /** Tạo một cột TableView đọc dữ liệu từ UserInfo bằng function truyền vào. */
     private TableColumn<UserInfo, String> column(String title, Function<UserInfo, String> value, double width) {
         TableColumn<UserInfo, String> column = new TableColumn<>(title);
         column.setCellValueFactory(data -> new ReadOnlyStringWrapper(value.apply(data.getValue())));
@@ -116,13 +123,14 @@ public final class ServerView extends BorderPane {
         return column;
     }
 
-    public void showUsers(List<UserInfo> all, List<UserInfo> filtered) {
-        long online = all.stream().filter(UserInfo::online).count();
-        userCount.setText(all.size() + " tài khoản · " + online + " online");
-        table.getItems().setAll(filtered);
+    /** Hiển thị toàn bộ danh sách tài khoản lên bảng server. */
+    public void showUsers(List<UserInfo> all) {
+        userCount.setText(all.size() + " tài khoản");
+        table.getItems().setAll(all);
         table.sort();
     }
 
+    /** Cập nhật trạng thái nút Khởi động/Dừng và badge Đang chạy/Đã dừng. */
     public void showRunning(boolean running, boolean busy) {
         start.setDisable(running || busy);
         stop.setDisable(!running || busy);
@@ -132,6 +140,7 @@ public final class ServerView extends BorderPane {
         status.getStyleClass().setAll(running ? "badge-online" : "badge-neutral");
     }
 
+    /** Thêm một dòng nhật ký kèm thời gian, tự cắt bớt nếu log quá dài. */
     void appendLog(String text) {
         logs.appendText(TIME.format(Instant.now()) + "  " + text + "\n");
         if (logs.getLength() > 50_000) {
@@ -140,13 +149,22 @@ public final class ServerView extends BorderPane {
         }
     }
 
+    /** Tạo cụm label + TextField dùng cho IP server và cổng TCP. */
     private static VBox field(String title, TextField input) {
         Label caption = label(title, "field-label");
         caption.setLabelFor(input);
         return new VBox(6, caption, input);
     }
+
+    /** Format Instant thành chuỗi ngày giờ, null thì hiển thị dấu gạch. */
     private static String time(Instant instant) { return instant == null ? "—" : TIME.format(instant); }
+
+    /** Tạo khoảng co giãn trong HBox để đẩy nội dung sang hai bên. */
     private static Region spacer() { Region region = new Region(); HBox.setHgrow(region, Priority.ALWAYS); return region; }
+
+    /** Tạo Label kèm style class CSS. */
     private static Label label(String text, String style) { Label label = new Label(text); label.getStyleClass().add(style); return label; }
+
+    /** Tạo Button kèm style class CSS. */
     private static Button button(String text, String style) { Button button = new Button(text); button.getStyleClass().add(style); return button; }
 }

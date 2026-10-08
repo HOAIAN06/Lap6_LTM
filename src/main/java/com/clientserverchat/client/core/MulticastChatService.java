@@ -1,3 +1,13 @@
+/*
+ * File: MulticastChatService.java
+ * Vai trò: Tầng mạng UDP multicast của client.
+ * Mục đích: Cho phép client tham gia/rời phòng chung, gửi/nhận tin nhắn nhóm và phát thông báo file nhóm.
+ * Phương thức chính:
+ * - thamGiaPhongMulticast()/roiPhongMulticast(): quản lý vòng đời MulticastSocket.
+ * - guiTinNhanNhom()/guiTepNhom(): gửi tin hoặc file vào phòng chung.
+ * - langNgheMulticast()/xuLyGoiTinMulticast(): nhận và xử lý gói UDP.
+ * - chonCardMang(): chọn NetworkInterface phù hợp trong LAN/máy ảo.
+ */
 package com.clientserverchat.client.core;
 
 import java.io.IOException;
@@ -12,10 +22,10 @@ import java.util.function.Consumer;
  * Dịch vụ mạng UDP Multicast cho chức năng Chat nhóm độc lập.
  * 
  * Quản lý vòng đời của MulticastSocket:
- * - Tham gia nhóm multicast (joinGroup)
+ * - Tham gia nhóm multicast (thamGiaPhongMulticast)
  * - Lắng nghe tin nhắn ngầm qua DatagramPacket trên luồng nền (receive)
  * - Gửi tin nhắn trực tiếp tới nhóm bằng UDP DatagramPacket (send)
- * - Rời nhóm và giải phóng socket an toàn (leaveGroup)
+ * - Rời nhóm và giải phóng socket an toàn (roiPhongMulticast)
  * - Tự động phát hiện NetworkInterface phù hợp trên Windows (Wi-Fi, Ethernet, VirtualBox, VMware)
  */
 public final class MulticastChatService implements AutoCloseable {
@@ -45,6 +55,7 @@ public final class MulticastChatService implements AutoCloseable {
     private Consumer<String> onError = err -> {};
     private Consumer<Boolean> onGroupStateChanged = state -> {};
 
+    /** Tạo service dùng địa chỉ/cổng multicast mặc định hoặc đọc từ JVM property. */
     public MulticastChatService() {
         this(
             System.getProperty("multicast.group", DEFAULT_GROUP_IP).trim(),
@@ -52,28 +63,34 @@ public final class MulticastChatService implements AutoCloseable {
         );
     }
 
+    /** Tạo service với địa chỉ multicast và cổng cụ thể, chủ yếu dùng cho test hoặc cấu hình lab. */
     public MulticastChatService(String groupIp, int groupPort) {
         this.groupIp = groupIp;
         this.groupPort = groupPort;
     }
 
+    /** Đăng ký callback khi nhận tin nhắn hoặc file nhóm. */
     public void setOnMessageReceived(Consumer<ChatMessage> callback) {
         this.onMessageReceived = Objects.requireNonNull(callback);
     }
 
+    /** Đăng ký callback cho thông báo hệ thống như người vào/rời phòng. */
     public void setOnSystemNotice(Consumer<String> callback) {
         this.onSystemNotice = Objects.requireNonNull(callback);
     }
 
+    /** Đăng ký callback báo lỗi multicast/file nhóm cho controller. */
     public void setOnError(Consumer<String> callback) {
         this.onError = Objects.requireNonNull(callback);
     }
 
+    /** Đăng ký callback khi trạng thái tham gia phòng thay đổi. */
     public void setOnGroupStateChanged(Consumer<Boolean> callback) {
         this.onGroupStateChanged = Objects.requireNonNull(callback);
     }
 
-    public boolean isJoined() {
+    /** Cho biết client hiện đã join nhóm multicast hay chưa. */
+    public boolean daThamGia() {
         return joined;
     }
 
@@ -81,7 +98,7 @@ public final class MulticastChatService implements AutoCloseable {
      * Tham gia vào nhóm Multicast.
      * Khởi tạo MulticastSocket với SO_REUSEADDR để nhiều client cùng máy có thể bind cùng port 5000.
      */
-    public synchronized void joinGroup(String username, InetAddress localTcpAddress) throws IOException {
+    public synchronized void thamGiaPhongMulticast(String username, InetAddress localTcpAddress) throws IOException {
         if (joined) return;
         if (username == null || username.isBlank()) {
             throw new IllegalArgumentException("Tên người dùng không hợp lệ");
@@ -99,7 +116,7 @@ public final class MulticastChatService implements AutoCloseable {
         }
 
         this.groupSocketAddress = new InetSocketAddress(mcastAddr, groupPort);
-        this.networkInterface = selectNetworkInterface(localTcpAddress);
+        this.networkInterface = chonCardMang(localTcpAddress);
 
         try {
             // Khởi tạo socket chưa bind để thiết lập SO_REUSEADDR trước khi bind port
@@ -139,10 +156,10 @@ public final class MulticastChatService implements AutoCloseable {
             receiverThread = Thread.ofPlatform()
                     .daemon(true)
                     .name("udp-multicast-receiver-" + currentUsername)
-                    .start(() -> receiveLoop(receivingSocket));
+                    .start(() -> langNgheMulticast(receivingSocket));
 
             // Gửi sự kiện JOIN|username tới toàn bộ thành viên trong nhóm
-            sendJoin(currentUsername);
+            guiThongBaoVaoPhong(currentUsername);
 
         } catch (BindException e) {
             closeSocketQuietly();
@@ -153,8 +170,9 @@ public final class MulticastChatService implements AutoCloseable {
         }
     }
 
-    public synchronized void joinGroup(String username) throws IOException {
-        joinGroup(username, null);
+    /** Tham gia phòng multicast khi không cần truyền trước địa chỉ TCP local. */
+    public synchronized void thamGiaPhongMulticast(String username) throws IOException {
+        thamGiaPhongMulticast(username, null);
     }
 
     /**
@@ -162,7 +180,7 @@ public final class MulticastChatService implements AutoCloseable {
      * Format gói tin: MESSAGE|username|timestamp|noi_dung
      * Gửi đúng 1 DatagramPacket trực tiếp đến địa chỉ nhóm (group IP:port).
      */
-    public void sendMessage(String message) throws IOException {
+    public void guiTinNhanNhom(String message) throws IOException {
         if (!joined || socket == null || socket.isClosed()) {
             throw new IOException("Chưa tham gia phòng chat nhóm Multicast");
         }
@@ -198,9 +216,10 @@ public final class MulticastChatService implements AutoCloseable {
         }
     }
 
-    public synchronized void sendFile(java.io.File file) throws IOException {
+    /** Gửi file vào phòng nhóm: phát FILE_OFFER qua UDP, nội dung file tải bằng TCP trực tiếp. */
+    public synchronized void guiTepNhom(java.io.File file) throws IOException {
         if (!joined || files == null || socket == null) throw new IOException("Tham gia phòng trước khi gửi tệp.");
-        byte[] payload = files.offer(file).getBytes(StandardCharsets.UTF_8);
+        byte[] payload = files.taoThongBaoChiaSe(file).getBytes(StandardCharsets.UTF_8);
         socket.send(new DatagramPacket(payload, payload.length, groupSocketAddress));
         onMessageReceived.accept(new ChatMessage(ChatMessage.GROUP, currentUsername, file.getName(), Instant.now(), true, true));
     }
@@ -208,7 +227,7 @@ public final class MulticastChatService implements AutoCloseable {
     /**
      * Gửi sự kiện JOIN|username vào nhóm.
      */
-    private void sendJoin(String username) {
+    private void guiThongBaoVaoPhong(String username) {
         try {
             if (socket != null && !socket.isClosed() && groupSocketAddress != null) {
                 byte[] bytes = ("JOIN|" + username).getBytes(StandardCharsets.UTF_8);
@@ -230,7 +249,7 @@ public final class MulticastChatService implements AutoCloseable {
      * - Đóng MulticastSocket an toàn
      * - Dừng background thread nhận dữ liệu
      */
-    public synchronized void leaveGroup() {
+    public synchronized void roiPhongMulticast() {
         if (!joined) return;
         joined = false;
         if (files != null) { files.close(); files = null; }
@@ -274,6 +293,7 @@ public final class MulticastChatService implements AutoCloseable {
         receivedMessageSignatures.clear();
     }
 
+    /** Đóng socket multicast và dịch vụ file nhóm, bỏ qua lỗi lúc đang dọn tài nguyên. */
     private void closeSocketQuietly() {
         if (files != null) { files.close(); files = null; }
         if (socket != null) {
@@ -287,7 +307,7 @@ public final class MulticastChatService implements AutoCloseable {
     /**
      * Vòng lặp lắng nghe DatagramPacket từ nhóm Multicast trên thread riêng biệt.
      */
-    private void receiveLoop(MulticastSocket receivingSocket) {
+    private void langNgheMulticast(MulticastSocket receivingSocket) {
         byte[] buffer = new byte[MAX_PACKET_BYTES];
         while (joined && socket == receivingSocket && !receivingSocket.isClosed()) {
             try {
@@ -303,8 +323,8 @@ public final class MulticastChatService implements AutoCloseable {
                 );
                 if (payload.startsWith("FILE_OFFER|")) {
                     GroupFileTransfer transfer = files;
-                    if (transfer != null) transfer.receive(payload, packet.getAddress());
-                } else handleIncomingPayload(payload);
+                    if (transfer != null) transfer.nhanThongBaoChiaSe(payload, packet.getAddress());
+                } else xuLyGoiTinMulticast(payload);
 
             } catch (SocketException e) {
                 // Socket đã được đóng an toàn khi rời nhóm hoặc thoát ứng dụng
@@ -328,7 +348,7 @@ public final class MulticastChatService implements AutoCloseable {
      * - LEAVE|username -> thông báo "username đã rời phòng."
      * - MESSAGE|username|timestamp|noi_dung -> hiển thị tin nhắn và khử trùng lặp
      */
-    private void handleIncomingPayload(String payload) {
+    private void xuLyGoiTinMulticast(String payload) {
         if (payload == null || payload.isBlank()) return;
         String[] parts = payload.split("\\|", 4);
         String type = parts[0];
@@ -401,13 +421,13 @@ public final class MulticastChatService implements AutoCloseable {
      * Lựa chọn NetworkInterface tối ưu trên Windows hỗ trợ nhiều adapter:
      * Wi-Fi, Ethernet, VirtualBox, VMware, máy ảo và LAN.
      */
-    private static NetworkInterface selectNetworkInterface(InetAddress preferredAddress) {
+    private static NetworkInterface chonCardMang(InetAddress preferredAddress) {
         // 1. Kiểm tra cấu hình tường minh qua JVM property
         String configured = System.getProperty("multicast.interface", System.getProperty("chat.interface", "")).trim();
         if (!configured.isEmpty()) {
             try {
                 NetworkInterface nif = NetworkInterface.getByName(configured);
-                if (nif != null && isUsable(nif)) return nif;
+                if (nif != null && cardDungDuoc(nif)) return nif;
             } catch (Exception ignored) {}
         }
 
@@ -415,7 +435,7 @@ public final class MulticastChatService implements AutoCloseable {
         if (preferredAddress != null && !preferredAddress.isLoopbackAddress()) {
             try {
                 NetworkInterface nif = NetworkInterface.getByInetAddress(preferredAddress);
-                if (nif != null && isUsable(nif)) return nif;
+                if (nif != null && cardDungDuoc(nif)) return nif;
             } catch (Exception ignored) {}
         }
 
@@ -423,7 +443,7 @@ public final class MulticastChatService implements AutoCloseable {
         try (DatagramSocket route = new DatagramSocket()) {
             route.connect(InetAddress.getByAddress(new byte[]{(byte) 192, 0, 2, 1}), 9);
             NetworkInterface routed = NetworkInterface.getByInetAddress(route.getLocalAddress());
-            if (routed != null && isUsable(routed) && !routed.isLoopback()) {
+            if (routed != null && cardDungDuoc(routed) && !routed.isLoopback()) {
                 return routed;
             }
         } catch (Exception ignored) {}
@@ -433,14 +453,14 @@ public final class MulticastChatService implements AutoCloseable {
             List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
             List<NetworkInterface> usable = new ArrayList<>();
             for (NetworkInterface nif : interfaces) {
-                if (isUsable(nif)) {
+                if (cardDungDuoc(nif)) {
                     usable.add(nif);
                 }
             }
 
             // Ưu tiên 1: Card mạng vật lý thật (LAN / Wi-Fi)
             for (NetworkInterface nif : usable) {
-                if (!nif.isLoopback() && !isVirtualAdapter(nif)) {
+                if (!nif.isLoopback() && !laCardAo(nif)) {
                     return nif;
                 }
             }
@@ -463,7 +483,8 @@ public final class MulticastChatService implements AutoCloseable {
         return null;
     }
 
-    private static boolean isUsable(NetworkInterface nif) {
+    /** Kiểm tra card mạng có bật, hỗ trợ multicast và có địa chỉ IPv4 hay không. */
+    private static boolean cardDungDuoc(NetworkInterface nif) {
         try {
             return nif != null && nif.isUp() && nif.supportsMulticast()
                     && Collections.list(nif.getInetAddresses()).stream().anyMatch(a -> a instanceof Inet4Address);
@@ -472,7 +493,8 @@ public final class MulticastChatService implements AutoCloseable {
         }
     }
 
-    private static boolean isVirtualAdapter(NetworkInterface nif) {
+    /** Nhận diện card mạng ảo/VPN để ưu tiên card LAN/Wi-Fi thật trước. */
+    private static boolean laCardAo(NetworkInterface nif) {
         if (nif.isVirtual()) return true;
         String name = (nif.getName() + " " + nif.getDisplayName()).toLowerCase(Locale.ROOT);
         return name.contains("virtual") || name.contains("vmware") || name.contains("vbox")
@@ -480,8 +502,9 @@ public final class MulticastChatService implements AutoCloseable {
                 || name.contains("teredo") || name.contains("wsl");
     }
 
+    /** Đóng service multicast bằng cách rời phòng nếu đang tham gia. */
     @Override
     public void close() {
-        leaveGroup();
+        roiPhongMulticast();
     }
 }

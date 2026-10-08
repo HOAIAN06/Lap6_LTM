@@ -1,3 +1,8 @@
+/*
+ * File: RegistrationTest.java
+ * Vai trò: Test giao diện đăng nhập/đăng ký client.
+ * Mục đích: Kiểm tra form JavaFX, nút Kết nối, đăng ký, lỗi nhập lại mật khẩu và lỗi server.
+ */
 package com.clientserverchat.client.ui;
 
 import com.clientserverchat.client.core.ChatClient;
@@ -24,6 +29,7 @@ class RegistrationTest {
     private ClientController controller;
     private javafx.scene.Node loginPage;
 
+    /** Khởi động JavaFX toolkit một lần để các test UI có thể tạo Scene/Control. */
     @BeforeAll static void startJavaFx() throws Exception {
         CompletableFuture<Void> started = new CompletableFuture<>();
         Platform.startup(() -> {
@@ -33,8 +39,9 @@ class RegistrationTest {
         started.get(10, TimeUnit.SECONDS);
     }
 
+    /** Tạo server test, client view/controller và điền sẵn form đăng ký trước mỗi test. */
     @BeforeEach void setUp() throws Exception {
-        registry = new UserRegistry(directory.resolve("accounts.properties"));
+        registry = new UserRegistry(directory.resolve("accounts.txt"));
         server = new ChatServer("127.0.0.1", 0, registry, ignored -> {});
         server.start();
         fx(() -> {
@@ -53,11 +60,13 @@ class RegistrationTest {
         });
     }
 
+    /** Dọn controller và server sau mỗi test để không giữ socket/luồng nền. */
     @AfterEach void tearDown() throws Exception {
         if (controller != null) fx(controller::close);
         if (server != null) server.close();
     }
 
+    /** Kiểm tra nhập lại mật khẩu sai thì vẫn ở form login và highlight ô xác nhận. */
     @Test void invalidConfirmationStaysOnFormAndHighlightsField() throws Exception {
         fx(() -> {
             view.confirmPassword.setText("Secret123!");
@@ -70,9 +79,10 @@ class RegistrationTest {
             assertEquals("", view.loginError.getText());
             assertFalse(view.confirmPassword.getPseudoClassStates().contains(PseudoClass.getPseudoClass("invalid")));
         });
-        assertTrue(registry.snapshot().isEmpty());
+        assertTrue(registry.danhSachNguoiDung().isEmpty());
     }
 
+    /** Kiểm tra nút Kết nối chỉ test TCP server, không đăng nhập hay tạo tài khoản. */
     @Test void serverCheckShowsFeedbackWithoutLoggingIn() throws Exception {
         fx(() -> {
             view.connectServer.fire();
@@ -85,13 +95,14 @@ class RegistrationTest {
             assertEquals("● Kết nối thành công", view.serverStatus.getText());
             assertSame(loginPage, view.getCenter());
         });
-        assertTrue(registry.snapshot().isEmpty());
+        assertTrue(registry.danhSachNguoiDung().isEmpty());
         server.close();
         fx(() -> view.connectServer.fire());
         awaitUi(() -> !view.connectServer.isDisabled());
         fx(() -> assertTrue(view.serverStatus.getText().contains("Không thể kết nối")));
     }
 
+    /** Kiểm tra đăng ký khóa form, mở màn hình chat và xóa mật khẩu trên form. */
     @Test void signupLocksFormThenOpensChatAndClearsSecrets() throws Exception {
         fx(() -> {
             view.connect.fire();
@@ -113,12 +124,13 @@ class RegistrationTest {
             assertTrue(view.send.isDisabled());
             assertTrue(view.attach.isDisabled());
         });
-        assertEquals(1, registry.snapshot().size());
-        assertTrue(registry.snapshot().getFirst().online());
+        assertEquals(1, registry.danhSachNguoiDung().size());
+        assertTrue(registry.danhSachNguoiDung().getFirst().online());
     }
 
+    /** Kiểm tra tài khoản trùng báo lỗi server và người dùng có thể đổi tên để đăng ký lại. */
     @Test void duplicateAccountShowsServerErrorAndCanRetry() throws Exception {
-        registry.register("Minh_Đức", "Original123!");
+        registry.dangKi("Minh_Đức", "Original123!");
         fx(() -> view.connect.fire());
         awaitUi(() -> !view.connect.isDisabled() && !view.loginError.getText().isEmpty());
         fx(() -> {
@@ -129,9 +141,10 @@ class RegistrationTest {
             view.connect.fire();
         });
         awaitUi(() -> view.getCenter() != loginPage);
-        assertEquals(2, registry.snapshot().size());
+        assertEquals(2, registry.danhSachNguoiDung().size());
     }
 
+    /** Kiểm tra chuyển từ Đăng ký sang Đăng nhập sẽ ẩn ô xác nhận và xóa lỗi validate. */
     @Test void switchingToLoginHidesConfirmationAndClearsValidation() throws Exception {
         fx(() -> {
             view.confirmPassword.clear();
@@ -149,6 +162,7 @@ class RegistrationTest {
         });
     }
 
+    /** Kiểm tra server tắt thì form mở khóa lại và báo lỗi dễ hiểu. */
     @Test void unavailableServerShowsActionableErrorAndUnlocksForm() throws Exception {
         server.close();
         fx(() -> view.connect.fire());
@@ -162,12 +176,14 @@ class RegistrationTest {
         });
     }
 
+    /** Chạy một đoạn code trên JavaFX Application Thread và chờ hoàn tất. */
     private static void fx(Runnable action) throws Exception {
         FutureTask<Void> task = new FutureTask<>(action, null);
         Platform.runLater(task);
         task.get(10, TimeUnit.SECONDS);
     }
 
+    /** Chờ đến khi điều kiện UI đúng, dùng cho các thao tác async. */
     private static void awaitUi(BooleanSupplier condition) throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (System.nanoTime() < deadline) {

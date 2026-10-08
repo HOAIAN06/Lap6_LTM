@@ -1,3 +1,8 @@
+/*
+ * File: MulticastChatServiceTest.java
+ * Vai trò: Test chức năng UDP multicast và file nhóm.
+ * Mục đích: Kiểm tra join/leave phòng, gửi tin nhóm, chống trùng loopback và tải file nhóm.
+ */
 package com.clientserverchat.client.core;
 
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +28,7 @@ class MulticastChatServiceTest {
 
     private final List<MulticastChatService> services = new ArrayList<>();
 
+    /** Đóng toàn bộ service multicast sau mỗi test để giải phóng port UDP/TCP. */
     @AfterEach
     void tearDown() {
         for (MulticastChatService svc : services) {
@@ -33,12 +39,14 @@ class MulticastChatServiceTest {
         services.clear();
     }
 
+    /** Tạo service multicast dùng group/port test và lưu lại để dọn sau test. */
     private MulticastChatService createService() {
         MulticastChatService svc = new MulticastChatService(TEST_GROUP, TEST_PORT);
         services.add(svc);
         return svc;
     }
 
+    /** Kiểm tra file nhóm giữ nguyên byte, chỉ client đã tham gia phòng mới nhận được. */
     @Test
     void groupFilesPreserveBytesAndOnlyReachJoinedClients() throws Exception {
         MulticastChatService alice = createService(), bob = createService(), outsider = createService();
@@ -48,9 +56,9 @@ class MulticastChatServiceTest {
         byte[] bytes = new byte[1024 * 1024];
         new Random(42).nextBytes(bytes);
         Path source = Files.write(directory.resolve("tài-liệu.bin"), bytes);
-        assertThrows(java.io.IOException.class, () -> outsider.sendFile(source.toFile()));
-        bob.joinGroup("FileTestBob"); alice.joinGroup("FileTestAlice");
-        alice.sendFile(source.toFile());
+        assertThrows(java.io.IOException.class, () -> outsider.guiTepNhom(source.toFile()));
+        bob.thamGiaPhongMulticast("FileTestBob"); alice.thamGiaPhongMulticast("FileTestAlice");
+        alice.guiTepNhom(source.toFile());
         ChatMessage message = inbox.poll(5, TimeUnit.SECONDS);
         assertNotNull(message);
         assertTrue(message.file());
@@ -58,12 +66,12 @@ class MulticastChatServiceTest {
         try { assertArrayEquals(bytes, Files.readAllBytes(saved)); }
         finally { Files.deleteIfExists(saved); }
         assertNull(outside.poll(100, TimeUnit.MILLISECONDS));
-        bob.leaveGroup();
-        alice.sendFile(source.toFile());
+        bob.roiPhongMulticast();
+        alice.guiTepNhom(source.toFile());
         assertNull(inbox.poll(200, TimeUnit.MILLISECONDS));
-        bob.joinGroup("FileTestBob");
+        bob.thamGiaPhongMulticast("FileTestBob");
         Path empty = Files.createFile(directory.resolve("empty.txt"));
-        alice.sendFile(empty.toFile());
+        alice.guiTepNhom(empty.toFile());
         message = inbox.poll(5, TimeUnit.SECONDS);
         assertNotNull(message);
         saved = Path.of(message.content().split("\nĐã lưu: ", 2)[1]);
@@ -71,18 +79,20 @@ class MulticastChatServiceTest {
         finally { Files.deleteIfExists(saved); }
     }
 
+    /** Kiểm tra trạng thái tham gia/rời phòng multicast cơ bản. */
     @Test
     void testJoinAndLeaveGroup() throws Exception {
         MulticastChatService service = createService();
-        assertFalse(service.isJoined());
+        assertFalse(service.daThamGia());
 
-        service.joinGroup("Alice");
-        assertTrue(service.isJoined());
+        service.thamGiaPhongMulticast("Alice");
+        assertTrue(service.daThamGia());
 
-        service.leaveGroup();
-        assertFalse(service.isJoined());
+        service.roiPhongMulticast();
+        assertFalse(service.daThamGia());
     }
 
+    /** Kiểm tra hai client trong cùng group nhận được tin nhắn và thông báo JOIN/LEAVE. */
     @Test
     void testMulticastMessageExchangeBetweenClients() throws Exception {
         MulticastChatService alice = createService();
@@ -95,17 +105,17 @@ class MulticastChatServiceTest {
         bob.setOnSystemNotice(bobNotices::add);
 
         // Bob joins first
-        bob.joinGroup("Bob");
+        bob.thamGiaPhongMulticast("Bob");
 
         // Alice joins (Bob should receive JOIN event)
-        alice.joinGroup("Alice");
+        alice.thamGiaPhongMulticast("Alice");
 
         String joinNotice = bobNotices.poll(3, TimeUnit.SECONDS);
         assertNotNull(joinNotice);
         assertTrue(joinNotice.contains("Alice") && joinNotice.contains("tham gia"));
 
         // Alice sends a multicast message
-        alice.sendMessage("Xin chào từ Alice");
+        alice.guiTinNhanNhom("Xin chào từ Alice");
 
         ChatMessage received = bobReceived.poll(3, TimeUnit.SECONDS);
         assertNotNull(received, "Bob phải nhận được tin nhắn multicast từ Alice");
@@ -114,20 +124,21 @@ class MulticastChatServiceTest {
         assertFalse(received.outgoing());
 
         // Alice leaves (Bob should receive LEAVE event)
-        alice.leaveGroup();
+        alice.roiPhongMulticast();
         String leaveNotice = bobNotices.poll(3, TimeUnit.SECONDS);
         assertNotNull(leaveNotice);
         assertTrue(leaveNotice.contains("Alice") && leaveNotice.contains("rời phòng"));
     }
 
+    /** Kiểm tra người gửi không hiển thị trùng tin do packet loopback của chính mình. */
     @Test
     void testSenderDoesNotReceiveDuplicate() throws Exception {
         MulticastChatService alice = createService();
         BlockingQueue<ChatMessage> aliceReceived = new LinkedBlockingQueue<>();
         alice.setOnMessageReceived(aliceReceived::add);
 
-        alice.joinGroup("Alice");
-        alice.sendMessage("Tin nhắn kiểm tra chống trùng");
+        alice.thamGiaPhongMulticast("Alice");
+        alice.guiTinNhanNhom("Tin nhắn kiểm tra chống trùng");
 
         // Vì loopback packet bị sentMessageSignatures lọc bỏ, aliceReceived không nhận lại packet này
         ChatMessage duplicate = aliceReceived.poll(500, TimeUnit.MILLISECONDS);

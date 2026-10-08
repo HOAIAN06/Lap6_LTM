@@ -16,15 +16,15 @@
 
 - Chọn IPv4 và cổng TCP, khởi động/dừng server; xử lý nhiều kết nối bằng virtual thread.
 - `0.0.0.0` nhận kết nối trên các card mạng; `127.0.0.1` chỉ nhận kết nối cùng máy. IP cụ thể phải thuộc máy server.
-- Bảng tài khoản gồm tên, mật khẩu có trong phiên, IP, lần đăng nhập/đăng xuất gần nhất và trạng thái online/offline.
-- Đếm tài khoản/online, tìm theo tên hoặc IP, lọc người đang online.
+- Bảng tài khoản gồm tên, mật khẩu rõ, IP, lần đăng nhập/đăng xuất gần nhất và trạng thái online/offline.
+- Đếm tổng số tài khoản và hiển thị toàn bộ danh sách trong bảng server.
 - Nhật ký đăng ký, đăng nhập, ngắt kết nối, gửi tin/file riêng, làm mới danh sách và lỗi. Có nút xóa nhật ký; nhật ký chỉ giữ trong phiên chạy.
 - Dừng server ngắt client và ghi giờ ra. Hoạt động phòng chung không đi qua server nên không được ghi vào nhật ký server.
 
 ### Client
 
 - Kiểm tra kết nối server với trạng thái đang kết nối, thành công hoặc thất bại.
-- Đăng ký có xác nhận mật khẩu; kiểm tra dữ liệu nhập và hiển thị lỗi ngay trên form.
+- Đăng ký có xác nhận mật khẩu; ô mật khẩu là ô chữ thường nên luôn hiển thị nội dung đang nhập.
 - Danh sách online tự cập nhật, có tìm kiếm và làm mới; danh sách không bao gồm chính mình.
 - Chat riêng, gửi file riêng tới người online qua server.
 - Tham gia/rời phòng chung, nhắn tin multicast, nhận thông báo người vào/ra và lọc tin trùng.
@@ -93,26 +93,70 @@ src/test/java/                      Kiểm thử JUnit
 
 Các lớp `core` và `common` không phụ thuộc JavaFX. Controller gọi dịch vụ mạng ở luồng nền và cập nhật giao diện bằng `Platform.runLater`.
 
-## 5. Build và chạy
+## 5. Tên phương thức chính để tìm chức năng
+
+Các tên phương thức nghiệp vụ được Việt hóa không dấu để dễ tìm bằng Ctrl+F trong IDE:
+
+| Phương thức | Nằm ở | Chức năng |
+|---|---|---|
+| `dangNhap(...)` | `client/core/ChatClient.java` | Client mở kết nối TCP và gửi lệnh `LOGIN` tới server. |
+| `dangKi(...)` | `client/core/ChatClient.java`, `server/core/UserRegistry.java` | Client gửi lệnh `SIGNUP`; server tạo tài khoản mới và lưu mật khẩu rõ. |
+| `dangXuat()` | `client/core/ChatClient.java` | Đóng socket TCP, gỡ client khỏi danh sách online. |
+| `guiTinNhan(...)` | `client/core/ChatClient.java` | Gửi tin nhắn riêng qua mô hình Client -> TCP Server -> Client. |
+| `guiTep(...)` | `client/core/ChatClient.java` | Gửi file riêng qua TCP server, giới hạn 20 MiB. |
+| `lamMoiDanhSachNguoiDung()` | `client/core/ChatClient.java` | Hỏi server danh sách người dùng đang online. |
+| `thamGiaPhongMulticast(...)` | `client/core/MulticastChatService.java` | Join nhóm UDP multicast `230.0.0.1:5000` để chat phòng chung. |
+| `roiPhongMulticast()` | `client/core/MulticastChatService.java` | Rời nhóm multicast, đóng socket nhận tin nhóm. |
+| `guiTinNhanNhom(...)` | `client/core/MulticastChatService.java` | Gửi tin nhắn phòng chung bằng UDP multicast. |
+| `guiTepNhom(...)` | `client/core/MulticastChatService.java` | Phát thông báo file qua multicast, tải nội dung file bằng TCP trực tiếp giữa client. |
+| `kiemTraKetNoiServer()` | `client/ui/ClientController.java` | Nút **Kết nối** trên form login, chỉ kiểm tra IP/cổng TCP, chưa đăng nhập. |
+| `dangNhapHoacDangKi()` | `client/ui/ClientController.java` | Nút **Đăng nhập/Đăng ký**, kiểm tra form rồi gọi `dangNhap` hoặc `dangKi`. |
+| `khoiDongServer()` | `server/ui/ServerController.java` | Nút **Khởi động**, bind IP/cổng và bắt đầu nhận client TCP. |
+| `dungServer()` | `server/ui/ServerController.java` | Nút **Dừng server**, đóng toàn bộ phiên client và ghi giờ ra. |
+| `danhSachNguoiDung()` | `server/core/UserRegistry.java` | Snapshot dữ liệu bảng server: tài khoản, IP, giờ vào, giờ ra, trạng thái, mật khẩu rõ. |
+| `ghiDangNhap(...)` / `ghiDangXuat(...)` | `server/core/UserRegistry.java` | Cập nhật IP, giờ vào/giờ ra và trạng thái online/offline cho giao diện server. |
+
+## 6. Build và chạy
 
 Cần **JDK 21 trở lên**. Đặt `JAVA_HOME` tới JDK; `java -version` cũng phải là phiên bản phù hợp nếu chạy lệnh `java` trực tiếp. Maven Wrapper có sẵn, lần đầu cần mạng để tải Maven và dependency.
 
-Tại thư mục project trên Windows:
+Tại thư mục project trên Windows, có 2 cách chạy bằng terminal.
+
+Cách 1: chạy bằng script có sẵn:
 
 ```powershell
 .\mvnw.cmd clean package
 .\run-server.cmd
 ```
 
-Trong cửa sổ server, chọn IP/cổng rồi bấm **Khởi động**. Mở terminal khác:
+Trong cửa sổ server, chọn IP/cổng rồi bấm **Khởi động**. Mở terminal khác để chạy client:
 
 ```powershell
 .\run-client.cmd
 ```
 
+Cách 2: chạy trực tiếp bằng Maven/Java không dùng script:
+
+```powershell
+.\mvnw.cmd clean package
+java -jar target/server-client-chat-app.jar server
+```
+
+Mở terminal thứ hai trong cùng thư mục project để chạy client:
+
+```powershell
+java -jar target/server-client-chat-app.jar client
+```
+
+Có thể mở thêm terminal thứ ba, thứ tư... và chạy lại lệnh client để tạo nhiều client:
+
+```powershell
+java -jar target/server-client-chat-app.jar client
+```
+
 Có thể chạy nhiều client. Hai script tự build nếu chưa có `target/server-client-chat-app.jar`; nếu JAR đã tồn tại, script dùng JAR đó. Sau khi sửa hoặc cập nhật code, chạy `mvnw.cmd package` trước khi mở lại ứng dụng.
 
-Chạy JAR trực tiếp:
+Tóm tắt lệnh JAR trực tiếp:
 
 ```powershell
 java -jar target/server-client-chat-app.jar server
@@ -123,7 +167,7 @@ Không truyền vai trò thì `Main` mở client. JAR kèm JavaFX; khi đổi h�
 
 Trong IntelliJ: Reload Maven, chọn Project SDK và Maven JRE là JDK 21+. Chạy `Main` với argument `server` hoặc `client`, hoặc chạy `ServerLauncher`/`ClientLauncher` trực tiếp. `ChatServer.main` là điểm chạy TCP server bằng console, không có giao diện quản lý.
 
-## 6. Demo trên máy chính và máy ảo
+## 7. Demo trên máy chính và máy ảo
 
 1. Đặt mạng máy ảo ở chế độ **Bridged** và bảo đảm các máy liên lạc được trong cùng LAN.
 2. Server trên máy chính dùng IP LAN hoặc `0.0.0.0`, cổng `2005`.
@@ -156,10 +200,12 @@ java -Dmulticast.group=230.0.0.1 -Dmulticast.port=5000 -jar server-client-chat-a
 
 TCP có thể hoạt động dù multicast bị chặn bởi firewall, VPN, chế độ mạng máy ảo hoặc Wi-Fi AP isolation.
 
-## 7. Dữ liệu và giới hạn
+## 8. Dữ liệu và giới hạn
 
-- `data/server/accounts.properties`: tài khoản, salt/hash mật khẩu, IP và giờ vào/ra gần nhất. Mật khẩu được băm bằng PBKDF2-HMAC-SHA256, 210.000 vòng; không lưu mật khẩu rõ vào file.
-- Bảng server hiển thị mật khẩu thật của tài khoản đã đăng ký hoặc xác thực thành công trong phiên ứng dụng. Tài khoản đọc từ file hiện **Chưa có trong phiên** cho tới khi đăng nhập. Mật khẩu hiển thị chỉ giữ trong bộ nhớ và không gửi trong danh sách online.
+- `data/server/accounts.txt`: tài khoản, mật khẩu rõ, IP và giờ vào/ra gần nhất. Đây là bài lab lập trình mạng nên không dùng băm/mã hóa mật khẩu. Dữ liệu lưu dạng `key=value`:
+  - `format=2` để phân biệt với định dạng cũ.
+  - `<tài khoản>.password`, `<tài khoản>.ip`, `<tài khoản>.login`, `<tài khoản>.logout` cho từng người dùng.
+- Bảng server luôn hiển thị mật khẩu thật của tài khoản đã đăng ký hoặc đọc từ file dữ liệu. Client cũng luôn hiển thị mật khẩu khi nhập vì dùng `TextField`, không dùng `PasswordField`.
 - `downloads/<username>/`: file riêng có tiền tố `received_`, file nhóm có tiền tố `group_`, tên duy nhất để tránh ghi đè. Các đường dẫn dữ liệu tính từ thư mục chạy.
 - Mở lại server thì tài khoản ban đầu đều offline. Nếu tiến trình bị tắt cưỡng bức, giờ ra có thể chưa được ghi.
 - Chưa lưu lịch sử chat xuống đĩa, chưa gửi tin cho người offline, chưa có tạo phòng riêng.
@@ -168,7 +214,7 @@ TCP có thể hoạt động dù multicast bị chặn bởi firewall, VPN, ch�
 - TCP chưa có TLS; multicast chưa mã hóa/xác thực người gửi. Đây là đồ án thực hành trong LAN, không phải dịch vụ chat triển khai công khai.
 - Khi cập nhật, dùng cùng bản JAR mới cho server và client; không trộn client cũ yêu cầu thông tin multicast từ server với server hiện tại.
 
-## 8. Kiểm thử
+## 9. Kiểm thử
 
 ```powershell
 .\mvnw.cmd test

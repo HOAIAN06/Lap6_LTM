@@ -1,3 +1,13 @@
+/*
+ * File: ClientController.java
+ * Vai trò: Controller cho giao diện client.
+ * Mục đích: Nối thao tác người dùng với ChatClient TCP và MulticastChatService UDP.
+ * Phương thức chính:
+ * - dangNhapHoacDangKi(): xử lý form đăng nhập/đăng ký.
+ * - send()/guiTep(): gửi tin nhắn hoặc file.
+ * - thamGiaPhongMulticast()/roiPhongMulticast(): quản lý phòng chung.
+ * - update()/render(): cập nhật trạng thái giao diện và lịch sử chat.
+ */
 package com.clientserverchat.client.ui;
 
 import com.clientserverchat.client.core.ChatClient;
@@ -29,6 +39,7 @@ public final class ClientController implements AutoCloseable {
     private boolean sending;
     private boolean refreshingList;
 
+    /** Gắn callback mạng và sự kiện UI cho toàn bộ màn hình client. */
     public ClientController(ChatClient client, ClientView view) {
         this.client = client;
         this.view = view;
@@ -47,7 +58,7 @@ public final class ClientController implements AutoCloseable {
                 view.showChat(loginName, serverAddress);
                 if (registered) view.showNotice("Đăng ký thành công! Chào mừng " + loginName + ".");
             } else {
-                multicastService.leaveGroup();
+                multicastService.roiPhongMulticast();
                 joining = false;
                 sending = false;
                 view.showLogin();
@@ -87,25 +98,25 @@ public final class ClientController implements AutoCloseable {
         }));
 
         // Gắn sự kiện các nút giao diện
-        view.connect.setOnAction(event -> connect());
-        view.connectServer.setOnAction(event -> handleServerConnect());
+        view.connect.setOnAction(event -> dangNhapHoacDangKi());
+        view.connectServer.setOnAction(event -> kiemTraKetNoiServer());
         view.host.setOnAction(event -> view.port.requestFocus());
         view.port.setOnAction(event -> view.username.requestFocus());
         view.username.setOnAction(event -> view.password.requestFocus());
         view.password.setOnAction(event -> {
             if (view.signUp.isSelected()) view.confirmPassword.requestFocus();
-            else connect();
+            else dangNhapHoacDangKi();
         });
-        view.confirmPassword.setOnAction(event -> connect());
+        view.confirmPassword.setOnAction(event -> dangNhapHoacDangKi());
         view.disconnect.setOnAction(event -> {
-            multicastService.leaveGroup();
-            client.disconnect();
+            multicastService.roiPhongMulticast();
+            client.dangXuat();
         });
         view.signUp.selectedProperty().addListener((observable, before, after) -> {
             view.confirmPassword.clear();
             view.clearAuthenticationError();
         });
-        view.refresh.setOnAction(event -> report(client.refreshUsers()));
+        view.refresh.setOnAction(event -> baoCaoKetQua(client.lamMoiDanhSachNguoiDung()));
         view.search.textProperty().addListener((observable, old, value) -> filterUsers());
         view.users.getSelectionModel().selectedItemProperty().addListener((observable, old, value) -> {
             if (!refreshingList && value != null) select(value);
@@ -113,8 +124,8 @@ public final class ClientController implements AutoCloseable {
 
         // Opening the room does not subscribe to multicast.
         view.groupRoom.setOnAction(event -> select(ChatMessage.GROUP));
-        view.groupAction.setOnAction(event -> toggleMulticastGroup());
-        view.leaveGroupHeader.setOnAction(event -> toggleMulticastGroup());
+        view.groupAction.setOnAction(event -> batTatPhongMulticast());
+        view.leaveGroupHeader.setOnAction(event -> batTatPhongMulticast());
         view.backButton.setOnAction(event -> {
             active = null;
             view.users.getSelectionModel().clearSelection();
@@ -126,7 +137,7 @@ public final class ClientController implements AutoCloseable {
         view.message.setOnKeyPressed(event -> {
             if (event.getCode() == KeyCode.ENTER && !event.isShiftDown()) { event.consume(); send(); }
         });
-        view.attach.setOnAction(event -> sendFile(view.chooseFile()));
+        view.attach.setOnAction(event -> guiTep(view.chooseFile()));
         view.messageScroll.setOnDragOver(event -> {
             if (event.getDragboard().hasFiles() && !view.attach.isDisabled()) {
                 event.acceptTransferModes(TransferMode.COPY);
@@ -138,7 +149,7 @@ public final class ClientController implements AutoCloseable {
             if (db.hasFiles() && !view.attach.isDisabled()) {
                 List<File> files = db.getFiles();
                 if (!files.isEmpty()) {
-                    sendFile(files.getFirst());
+                    guiTep(files.getFirst());
                     event.setDropCompleted(true);
                 }
             }
@@ -148,38 +159,41 @@ public final class ClientController implements AutoCloseable {
         update();
     }
 
-    private void toggleMulticastGroup() {
+    /** Bấm nút phòng chung: nếu chưa tham gia thì join, nếu đã tham gia thì rời phòng. */
+    private void batTatPhongMulticast() {
         if (!connected || joining) return;
         select(ChatMessage.GROUP);
-        if (multicastService.isJoined()) {
-            leaveMulticastGroup();
+        if (multicastService.daThamGia()) {
+            roiPhongMulticast();
         } else {
-            joinMulticastGroup();
+            thamGiaPhongMulticast();
         }
     }
 
-    private void joinMulticastGroup() {
+    /** Join nhóm UDP multicast bằng tên tài khoản hiện tại và địa chỉ local của TCP socket. */
+    private void thamGiaPhongMulticast() {
         if (!connected || loginName == null || joining) return;
         joining = true;
         update();
         CompletableFuture.runAsync(() -> {
             try {
-                multicastService.joinGroup(loginName, client.getLocalAddress());
+                multicastService.thamGiaPhongMulticast(loginName, client.layDiaChiMayClient());
             } catch (Exception e) {
                 Platform.runLater(() -> {
                     joining = false;
-                    error(e);
+                    baoLoi(e);
                     update();
                 });
             }
         });
     }
 
-    private void leaveMulticastGroup() {
+    /** Rời nhóm UDP multicast ở luồng nền rồi cập nhật lại trạng thái nút. */
+    private void roiPhongMulticast() {
         joining = true;
         update();
         CompletableFuture.runAsync(() -> {
-            multicastService.leaveGroup();
+            multicastService.roiPhongMulticast();
             Platform.runLater(() -> {
                 joining = false;
                 update();
@@ -187,30 +201,32 @@ public final class ClientController implements AutoCloseable {
         });
     }
 
-    private void sendFile(File file) {
+    /** Gửi file tới người đang chọn: file riêng qua TCP server, file nhóm qua multicast offer. */
+    private void guiTep(File file) {
         if (file == null || active == null || view.attach.isDisabled()) return;
         sending = true;
         String destination = active;
         update();
         CompletableFuture<Void> operation = ChatMessage.GROUP.equals(destination)
                 ? CompletableFuture.runAsync(() -> {
-                    try { multicastService.sendFile(file); }
+                    try { multicastService.guiTepNhom(file); }
                     catch (IOException e) { throw new java.util.concurrent.CompletionException(e); }
-                }) : client.sendFile(destination, file);
+                }) : client.guiTep(destination, file);
         operation.whenComplete((unused, error) -> Platform.runLater(() -> {
             sending = false;
-            if (error != null) error(error);
+            if (error != null) baoLoi(error);
             update();
         }));
     }
 
-    private void handleServerConnect() {
+    /** Nút Kết nối: chỉ thử mở socket tới IP/cổng server, không đăng nhập tài khoản. */
+    private void kiemTraKetNoiServer() {
         view.clearAuthenticationError();
         if (view.connectServer.isDisabled()) return;
         try {
-            int port = Authentication.parsePort(view.port.getText());
+            int port = Authentication.docCong(view.port.getText());
             String host = view.host.getText().trim();
-            Authentication.validate(host, port, "validUser", "validPassword");
+            Authentication.kiemTraDangNhap(host, port, "validUser", "validPassword");
             view.showConnectionChecking(true);
             view.serverStatus.setText("Đang kiểm tra kết nối…");
             view.serverStatus.getStyleClass().setAll("server-status", "server-status-checking");
@@ -238,17 +254,18 @@ public final class ClientController implements AutoCloseable {
         }
     }
 
-    private void connect() {
+    /** Đọc form, validate, rồi gọi dangNhap hoặc dangKi trên ChatClient. */
+    private void dangNhapHoacDangKi() {
         if (view.connect.isDisabled()) return;
         view.clearAuthenticationError();
         try {
-            int port = Authentication.parsePort(view.port.getText());
+            int port = Authentication.docCong(view.port.getText());
             String host = view.host.getText().trim();
             loginName = view.username.getText().trim();
             String password = view.password.getText();
             boolean signUp = view.signUp.isSelected();
-            Authentication.validate(host, port, loginName, password);
-            if (signUp) Authentication.validateConfirmation(password, view.confirmPassword.getText());
+            Authentication.kiemTraDangNhap(host, port, loginName, password);
+            if (signUp) Authentication.kiemTraNhapLaiMatKhau(password, view.confirmPassword.getText());
             serverAddress = host + ":" + port;
             conversations.clear(); drafts.clear(); active = null;
             view.message.clear();
@@ -256,19 +273,21 @@ public final class ClientController implements AutoCloseable {
             view.showNotice("");
             view.loginError.setText("");
             loginBusy(true);
-            client.connect(host, port, loginName, password, signUp)
+            (signUp ? client.dangKi(host, port, loginName, password) : client.dangNhap(host, port, loginName, password))
                     .whenComplete((unused, error) -> Platform.runLater(() -> {
-                        if (error != null) { loginBusy(false); error(error); }
+                        if (error != null) { loginBusy(false); baoLoi(error); }
                     }));
         } catch (Authentication.ValidationException e) {
             view.showValidationError(e);
-        } catch (IllegalArgumentException e) { error(e); }
+        } catch (IllegalArgumentException e) { baoLoi(e); }
     }
 
+    /** Khóa/mở form đăng nhập khi đang chờ phản hồi từ server. */
     private void loginBusy(boolean busy) {
         view.showAuthenticationBusy(busy);
     }
 
+    /** Lọc danh sách online ở sidebar client theo ô tìm kiếm. */
     private void filterUsers() {
         refreshingList = true;
         String query = view.search.getText().toLowerCase(Locale.ROOT);
@@ -278,6 +297,7 @@ public final class ClientController implements AutoCloseable {
         refreshingList = false;
     }
 
+    /** Chọn một cuộc trò chuyện, lưu bản nháp cũ và khôi phục bản nháp của phòng mới. */
     private void select(String conversation) {
         if (!Objects.equals(active, conversation)) {
             if (active != null) drafts.put(active, view.message.getText());
@@ -289,11 +309,13 @@ public final class ClientController implements AutoCloseable {
         render(); update();
     }
 
+    /** Vẽ lại lịch sử tin nhắn của cuộc trò chuyện đang mở. */
     private void render() { view.showConversation(conversations.getOrDefault(active, List.of())); }
 
+    /** Bật/tắt nút gửi, file, refresh, phòng nhóm theo trạng thái kết nối hiện tại. */
     private void update() {
         boolean isGroup = ChatMessage.GROUP.equals(active);
-        boolean isGroupJoined = multicastService.isJoined();
+        boolean isGroupJoined = multicastService.daThamGia();
         boolean available = connected && active != null && (isGroup ? isGroupJoined : online.contains(active));
 
         view.groupState(isGroupJoined, joining);
@@ -307,6 +329,7 @@ public final class ClientController implements AutoCloseable {
         view.configureHeader(isGroup, isGroupJoined, active);
     }
 
+    /** Gửi nội dung trong ô soạn thảo: tin nhóm qua UDP multicast, tin riêng qua TCP server. */
     private void send() {
         if (view.send.isDisabled() || view.message.getText().isBlank()) return;
         String text = view.message.getText().trim();
@@ -329,9 +352,9 @@ public final class ClientController implements AutoCloseable {
 
             CompletableFuture.runAsync(() -> {
                 try {
-                    multicastService.sendMessage(text);
+                    multicastService.guiTinNhanNhom(text);
                 } catch (Exception e) {
-                    Platform.runLater(() -> error(e));
+                    Platform.runLater(() -> baoLoi(e));
                 } finally {
                     Platform.runLater(() -> {
                         sending = false;
@@ -342,28 +365,31 @@ public final class ClientController implements AutoCloseable {
             });
         } else {
             // Gửi tin nhắn cá nhân 1-1 qua TCP ChatClient
-            CompletableFuture<Void> operation = client.sendMessage(destination, text);
+            CompletableFuture<Void> operation = client.guiTinNhan(destination, text);
             operation.whenComplete((unused, error) -> Platform.runLater(() -> {
                 sending = false;
                 if (error == null) {
                     drafts.remove(destination);
                     if (Objects.equals(active, destination)) view.message.clear();
-                } else error(error);
+                } else baoLoi(error);
                 update(); view.message.requestFocus();
             }));
         }
     }
 
-    private void report(CompletableFuture<Void> future) {
-        future.whenComplete((unused, error) -> { if (error != null) Platform.runLater(() -> error(error)); });
+    /** Gắn xử lý lỗi chung cho các thao tác CompletableFuture không cần xử lý thành công. */
+    private void baoCaoKetQua(CompletableFuture<Void> future) {
+        future.whenComplete((unused, error) -> { if (error != null) Platform.runLater(() -> baoLoi(error)); });
     }
 
-    private void error(Throwable error) {
-         String text = Authentication.errorMessage(error);
+    /** Đổi exception thành thông báo người dùng và hiển thị trên form/chat. */
+    private void baoLoi(Throwable error) {
+         String text = Authentication.thongBaoLoi(error);
          view.loginError.setText(text);
          view.showNotice(text);
     }
 
+    /** Đóng controller: rời multicast và đóng TCP client. */
     @Override public void close() {
         multicastService.close();
         client.close();

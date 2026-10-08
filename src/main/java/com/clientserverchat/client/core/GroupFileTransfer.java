@@ -1,3 +1,12 @@
+/*
+ * File: GroupFileTransfer.java
+ * Vai trò: Hỗ trợ gửi file trong phòng multicast.
+ * Mục đích: Multicast chỉ gửi thông báo FILE_OFFER nhỏ; nội dung file thật được tải qua TCP trực tiếp giữa client.
+ * Phương thức chính:
+ * - taoThongBaoChiaSe(): tạo token file để phát qua multicast.
+ * - nhanThongBaoChiaSe(): đọc FILE_OFFER và bắt đầu tải file.
+ * - phucVuTaiTep()/taiTep(): server tạm gửi file và client nhận file.
+ */
 package com.clientserverchat.client.core;
 
 import com.clientserverchat.common.Protocol;
@@ -11,6 +20,7 @@ import java.util.function.Consumer;
 
 /** Multicast advertises a short-lived file token; TCP transfers the actual bytes. */
 final class GroupFileTransfer implements AutoCloseable {
+    /** Thông tin file đang chia sẻ: đường dẫn, kích thước, thời điểm hết hạn token. */
     private record Shared(Path path, long size, long expires) {}
     private final ServerSocket listener;
     private final ExecutorService workers = Executors.newVirtualThreadPerTaskExecutor();
@@ -22,6 +32,7 @@ final class GroupFileTransfer implements AutoCloseable {
     private final Consumer<String> onError;
     private volatile boolean closed;
 
+    /** Mở ServerSocket tạm để các client khác tải file nhóm từ máy này. */
     GroupFileTransfer(String username, Consumer<ChatMessage> onMessage, Consumer<String> onError) throws IOException {
         this.username = username;
         this.onMessage = onMessage;
@@ -33,7 +44,7 @@ final class GroupFileTransfer implements AutoCloseable {
                     Socket socket = listener.accept();
                     sockets.add(socket);
                     if (closed) socket.close();
-                    else workers.execute(() -> serve(socket));
+                    else workers.execute(() -> phucVuTaiTep(socket));
                 } catch (IOException | RejectedExecutionException e) {
                     if (!closed) onError.accept("Không nhận được yêu cầu tải tệp.");
                 }
@@ -41,7 +52,8 @@ final class GroupFileTransfer implements AutoCloseable {
         });
     }
 
-    String offer(File file) throws IOException {
+    /** Tạo gói FILE_OFFER chứa token, cổng TCP tạm, kích thước và tên file. */
+    String taoThongBaoChiaSe(File file) throws IOException {
         String name = Protocol.validFilename(file.getName());
         if (!file.isFile() || file.length() > Protocol.MAX_FILE_BYTES) throw new IOException("Chọn tệp tối đa 20 MiB.");
         shared.values().removeIf(value -> value.expires < System.currentTimeMillis());
@@ -53,7 +65,8 @@ final class GroupFileTransfer implements AutoCloseable {
                 + Base64.getEncoder().encodeToString(name.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
-    private void serve(Socket socket) {
+    /** Phục vụ một client khác tải file bằng token đã phát qua multicast. */
+    private void phucVuTaiTep(Socket socket) {
         try (socket) {
             socket.setSoTimeout(10_000);
             DataInputStream in = new DataInputStream(socket.getInputStream());
@@ -67,7 +80,8 @@ final class GroupFileTransfer implements AutoCloseable {
         } finally { sockets.remove(socket); }
     }
 
-    void receive(String payload, InetAddress senderAddress) {
+    /** Nhận FILE_OFFER từ multicast, kiểm tra dữ liệu và tạo tác vụ tải file. */
+    void nhanThongBaoChiaSe(String payload, InetAddress senderAddress) {
         try {
             String[] parts = payload.split("\\|", 6);
             if (parts.length != 6 || parts[1].equals(username)) return;
@@ -79,11 +93,12 @@ final class GroupFileTransfer implements AutoCloseable {
             if (port < 1 || port > 65535 || size < 0 || size > Protocol.MAX_FILE_BYTES) return;
             if (received.size() > 1000) received.clear();
             if (!received.add(senderAddress.getHostAddress() + token)) return;
-            workers.execute(() -> download(senderAddress, port, token, sender, name, size));
+            workers.execute(() -> taiTep(senderAddress, port, token, sender, name, size));
         } catch (IOException | IllegalArgumentException | RejectedExecutionException ignored) {}
     }
 
-    private void download(InetAddress address, int port, String token, String sender, String name, long size) {
+    /** Kết nối TCP tới người gửi để tải nội dung file thật và lưu vào downloads/<username>. */
+    private void taiTep(InetAddress address, int port, String token, String sender, String name, long size) {
         Path saved = null;
         Socket socket = new Socket();
         sockets.add(socket);
@@ -117,6 +132,7 @@ final class GroupFileTransfer implements AutoCloseable {
         } finally { sockets.remove(socket); }
     }
 
+    /** Đóng socket tạm, hủy các kết nối tải file và xóa danh sách token đang chia sẻ. */
     @Override public void close() {
         closed = true;
         try { listener.close(); } catch (IOException ignored) {}
