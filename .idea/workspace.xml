@@ -1,0 +1,375 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
+  <component name="BackgroundAgentGlobalSettings">
+    <option name="selectedModelId" value="auto" />
+  </component>
+  <component name="ChangeListManager">
+    <list default="true" id="7e26a107-aa7f-420b-b2da-67c1d4e03b17" name="Changes" comment="logic2">
+      <change beforePath="$PROJECT_DIR$/src/main/java/com/clientserverchat/server/core/UserRegistry.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/clientserverchat/server/core/UserRegistry.java" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="CopilotChats">
+    <option name="panelChat">
+      <chat>
+        <option name="activeSessionId" value="65534592-b5f0-4d13-a81f-26d0ec986ef4" />
+        <option name="sessions">
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="65534592-b5f0-4d13-a81f-26d0ec986ef4" />
+            <option name="modeId" value="Agent" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="status" value="Completed" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="9ab1ec3b-9aed-494a-826d-5fdb7dc51ce7" />
+            <option name="modeId" value="Ask" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+          <session>
+            <option name="chatType" value="PANEL" />
+            <option name="id" value="bc7cc08b-d6d3-4452-9d94-86f32a0664ff" />
+            <option name="modeId" value="Ask" />
+            <option name="modelType" value="builtin_family" />
+            <option name="modelValue" value="auto" />
+            <option name="targetType" value="LOCAL" />
+          </session>
+        </option>
+        <option name="type" value="PANEL" />
+      </chat>
+    </option>
+  </component>
+  <component name="CopilotPersistence">
+    <persistenceIdMap>
+      <entry key="_E:/LTM/lap4-laptrinhmang" value="3JSaGlKfGx93FI9OZsC3CvuGc6s" />
+    </persistenceIdMap>
+  </component>
+  <component name="CopilotUserSelectedModel">
+    <selectedModels>
+      <entry key="agent-panel" value="Auto" />
+      <entry key="chat-panel" value="Auto" />
+    </selectedModels>
+  </component>
+  <component name="EmbeddingIndexingInfo">
+    <option name="cachedIndexableFilesCount" value="46" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;HOAIAN06&quot;
+  }
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/HOAIAN06/Lap6_LTM.git&quot;,
+    &quot;accountId&quot;: &quot;cb4c3e6f-360d-4270-9c2b-3b219f0e6c15&quot;
+  }
+}</component>
+  <component name="KubernetesApiPersistence">{}</component>
+  <component name="KubernetesApiProvider">{
+  &quot;isMigrated&quot;: true
+}</component>
+  <component name="MavenImportPreferences">
+    <option name="generalSettings">
+      <MavenGeneralSettings>
+        <option name="mavenHomeTypeForPersistence" value="WRAPPER" />
+      </MavenGeneralSettings>
+    </option>
+  </component>
+  <component name="McpProjectServerCommands">
+    <commands />
+    <urls />
+  </component>
+  <component name="NextEditCompletionFeaturesState">
+    <decayedCancelled>
+      <entry key="MS100" value="1.4496478397899746" />
+      <entry key="MS500" value="4.147126975442483" />
+      <entry key="S2" value="10.993026234657938" />
+      <entry key="S5" value="20.884295265049186" />
+      <entry key="S10" value="34.94288649348752" />
+      <entry key="S30" value="59.09134705718385" />
+      <entry key="S60" value="70.79241201687968" />
+      <entry key="M2" value="100.8664291966737" />
+      <entry key="M5" value="250.65003641795278" />
+      <entry key="M10" value="467.7246844536788" />
+      <entry key="M15" value="634.7290913181047" />
+      <entry key="M30" value="951.8772584571251" />
+      <entry key="H1" value="1249.0676756784999" />
+      <entry key="H2" value="1502.6696242021633" />
+      <entry key="H4" value="1697.0873292861963" />
+      <entry key="D1" value="1926.419022603566" />
+      <entry key="W1" value="1974.6528949785074" />
+    </decayedCancelled>
+    <decayedSelected>
+      <entry key="MS100" value="0.0" />
+      <entry key="MS500" value="0.0" />
+      <entry key="S2" value="0.0" />
+      <entry key="S5" value="0.0" />
+      <entry key="S10" value="0.0" />
+      <entry key="S30" value="0.0" />
+      <entry key="S60" value="0.0" />
+      <entry key="M2" value="0.0" />
+      <entry key="M5" value="0.0" />
+      <entry key="M10" value="0.0" />
+      <entry key="M15" value="0.0" />
+      <entry key="M30" value="0.0" />
+      <entry key="H1" value="0.0" />
+      <entry key="H2" value="0.0" />
+      <entry key="H4" value="0.0" />
+      <entry key="D1" value="0.0" />
+      <entry key="W1" value="0.0" />
+    </decayedSelected>
+    <decayedShown>
+      <entry key="MS100" value="1.2736123542475113" />
+      <entry key="MS500" value="4.084916655254482" />
+      <entry key="S2" value="10.960086030943906" />
+      <entry key="S5" value="20.860818295969057" />
+      <entry key="S10" value="34.92369683760653" />
+      <entry key="S30" value="59.080634564052374" />
+      <entry key="S60" value="70.78599425745598" />
+      <entry key="M2" value="100.86174074530179" />
+      <entry key="M5" value="250.64519715721886" />
+      <entry key="M10" value="467.72023319510885" />
+      <entry key="M15" value="634.7251225847896" />
+      <entry key="M30" value="951.8743384320835" />
+      <entry key="H1" value="1249.0657752684576" />
+      <entry key="H2" value="1502.6684813169813" />
+      <entry key="H4" value="1697.0866821391778" />
+      <entry key="D1" value="1926.4188995846177" />
+      <entry key="W1" value="1974.652876944487" />
+    </decayedShown>
+  </component>
+  <component name="ProjectColorInfo">{
+  &quot;associatedIndex&quot;: 3,
+  &quot;fromUser&quot;: false
+}</component>
+  <component name="ProjectId" id="3JSaGlKfGx93FI9OZsC3CvuGc6s" />
+  <component name="ProjectSessionTemplates">
+    <option name="panelTemplate">
+      <template>
+        <option name="modeId" value="Ask" />
+        <option name="model">
+          <model>
+            <option name="modelType" value="builtin_id" />
+            <option name="modelValue" value="auto" />
+          </model>
+        </option>
+        <option name="targetType" value="LOCAL" />
+      </template>
+    </option>
+  </component>
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "Application.ChatServer.executor": "Run",
+    "Application.Client.executor": "Run",
+    "Application.ClientLauncher.executor": "Run",
+    "Application.DiscoveryServer.executor": "Run",
+    "Application.ServerApp.executor": "Run",
+    "Application.ServerLauncher.executor": "Run",
+    "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "RunOnceActivity.MCP Project settings loaded": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
+    "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "copilot.chat.legacySessionMetadata.migrated": "true",
+    "git-widget-placeholder": "main",
+    "ignore.virus.scanning.warn.message": "true",
+    "kotlin-language-version-configured": "true",
+    "last_opened_file_path": "E:/LTM/lap6-laptrinhmang",
+    "node.js.detected.package.eslint": "true",
+    "node.js.detected.package.tslint": "true",
+    "node.js.selected.package.eslint": "(autodetect)",
+    "node.js.selected.package.tslint": "(autodetect)",
+    "nodejs_package_manager_path": "npm",
+    "project.structure.last.edited": "Modules",
+    "project.structure.proportion": "0.15",
+    "project.structure.side.proportion": "0.2",
+    "settings.editor.selected.configurable": "ml.llm.AcpAgentsConfigurable",
+    "vue.rearranger.settings.migration": "true"
+  }
+}]]></component>
+  <component name="RunManager" selected="Application.ClientLauncher">
+    <configuration name="ChatServer" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.clientserverchat.server.core.ChatServer" />
+      <module name="server-client-chat" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.clientserverchat.server.core.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="Client" type="Application" factoryName="Application" temporary="true">
+      <option name="MAIN_CLASS_NAME" value="com.clientserverchat.Main" />
+      <module name="server-client-chat" />
+      <option name="PROGRAM_PARAMETERS" value="client" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.clientserverchat.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ClientLauncher" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.clientserverchat.client.ClientLauncher" />
+      <module name="server-client-chat" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.clientserverchat.client.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ServerApp" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.clientserverchat.server.ServerApp" />
+      <module name="P2PChat" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.clientserverchat.server.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <configuration name="ServerLauncher" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
+      <option name="MAIN_CLASS_NAME" value="com.clientserverchat.server.ServerLauncher" />
+      <module name="server-client-chat" />
+      <extension name="coverage">
+        <pattern>
+          <option name="PATTERN" value="com.clientserverchat.server.*" />
+          <option name="ENABLED" value="true" />
+        </pattern>
+      </extension>
+      <method v="2">
+        <option name="Make" enabled="true" />
+      </method>
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Application.ClientLauncher" />
+        <item itemvalue="Application.ServerLauncher" />
+        <item itemvalue="Application.ChatServer" />
+        <item itemvalue="Application.ServerApp" />
+        <item itemvalue="Application.Client" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SharedIndexes">
+    <attachedChunks>
+      <set>
+        <option value="bundled-jdk-30f59d01ecdd-a203e0a19954-intellij.indexing.shared.core-IU-262.10968.63" />
+        <option value="bundled-js-predefined-d6986cc7102b-4abd2a77f808-JavaScript-IU-262.10968.63" />
+      </set>
+    </attachedChunks>
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="7e26a107-aa7f-420b-b2da-67c1d4e03b17" name="Changes" comment="" />
+      <created>1789656830894</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1789656830894</updated>
+      <workItem from="1789656832040" duration="3357000" />
+      <workItem from="1789690734574" duration="1257000" />
+      <workItem from="1789703044920" duration="3271000" />
+      <workItem from="1789708672327" duration="1352000" />
+      <workItem from="1789713910182" duration="6594000" />
+      <workItem from="1789755089219" duration="20000" />
+      <workItem from="1791217901770" duration="3153000" />
+      <workItem from="1791255015050" duration="2643000" />
+      <workItem from="1791273994497" duration="1062000" />
+      <workItem from="1791275095465" duration="3557000" />
+      <workItem from="1791280027478" duration="257000" />
+      <workItem from="1791280305180" duration="168000" />
+      <workItem from="1791280496591" duration="113000" />
+      <workItem from="1791280630972" duration="313000" />
+      <workItem from="1791281234351" duration="390000" />
+      <workItem from="1791281646837" duration="600000" />
+      <workItem from="1791282529198" duration="483000" />
+      <workItem from="1791283220428" duration="1640000" />
+      <workItem from="1791284889258" duration="10562000" />
+      <workItem from="1791476766250" duration="1647000" />
+      <workItem from="1791528843307" duration="1050000" />
+    </task>
+    <task id="LOCAL-00001" summary="logic">
+      <option name="closed" value="true" />
+      <created>1791274583279</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1791274583279</updated>
+    </task>
+    <task id="LOCAL-00002" summary="logic2">
+      <option name="closed" value="true" />
+      <created>1791299932892</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1791299932892</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="logic" />
+    <MESSAGE value="logic2" />
+    <option name="LAST_COMMIT_MESSAGE" value="logic2" />
+  </component>
+  <component name="XSLT-Support.FileAssociations.UIState">
+    <expand />
+    <select />
+  </component>
+  <component name="github-copilot-workspace">
+    <instructionFileLocations>
+      <option value=".github/instructions" />
+    </instructionFileLocations>
+    <promptFileLocations>
+      <option value=".github/prompts" />
+    </promptFileLocations>
+  </component>
+</project>

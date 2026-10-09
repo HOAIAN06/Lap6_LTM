@@ -26,7 +26,7 @@ public final class UserRegistry {
     private Consumer<List<UserInfo>> onChange = ignored -> {};
 
     /** Dữ liệu tài khoản lưu nội bộ: mật khẩu rõ, IP, giờ vào, giờ ra. */
-    private record Account(String password, String ip, Instant login, Instant logout) {}
+    private record Account(String password, String ip, Instant created, Instant login, Instant logout) {}
 
     /** Mở file tài khoản, đọc dữ liệu format=2; file format cũ sẽ được bỏ qua. */
     public UserRegistry(Path file) throws IOException {
@@ -49,7 +49,7 @@ public final class UserRegistry {
                     String ip = saved.getProperty("ip", "");
                     Instant login = parseTime(saved.getProperty("login", ""));
                     Instant logout = parseTime(saved.getProperty("logout", ""));
-                    accounts.put(name, new Account(password, ip, login, logout));
+                    accounts.put(name, new Account(password, ip, parseTime(saved.getProperty("created", "")), login, logout));
                 } catch (IOException | RuntimeException e) {
                     // skip malformed account file
                 }
@@ -77,7 +77,7 @@ public final class UserRegistry {
         Protocol.validName(name);
         kiemTraMatKhau(password);
         if (accounts.containsKey(name)) throw new IOException("Tài khoản đã tồn tại. Hãy chọn Đăng nhập.");
-        Account account = new Account(password, "", null, null);
+        Account account = new Account(password, "", Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS), null, null);
         accounts.put(name, account);
         try { luu(); } catch (IOException e) { accounts.remove(name); throw e; }
         phatDuLieuMoi();
@@ -99,9 +99,14 @@ public final class UserRegistry {
     public synchronized void ghiDangNhap(String name, String sessionId, String ip) throws IOException {
         Account old = accounts.get(name);
         if (old == null) throw new IOException("Tài khoản không tồn tại");
-        accounts.put(name, new Account(old.password, ip, Instant.now(), null));
-        try { luu(); } catch (IOException e) { accounts.put(name, old); throw e; }
-        activeSessions.put(name, sessionId);
+        accounts.put(name, new Account(old.password, ip, old.created, Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS), null));
+        String previous = activeSessions.put(name, sessionId);
+        try { luu(); } catch (IOException e) {
+            accounts.put(name, old);
+            if (previous == null) activeSessions.remove(name);
+            else activeSessions.put(name, previous);
+            throw e;
+        }
         phatDuLieuMoi();
     }
 
@@ -109,7 +114,7 @@ public final class UserRegistry {
     public synchronized void ghiDangXuat(String name, String sessionId) throws IOException {
         if (!activeSessions.remove(name, sessionId)) return;
         Account old = accounts.get(name);
-        accounts.put(name, new Account(old.password, old.ip, old.login, Instant.now()));
+        accounts.put(name, new Account(old.password, old.ip, old.created, old.login, Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS)));
         try { luu(); } finally { phatDuLieuMoi(); }
     }
 
@@ -137,11 +142,18 @@ public final class UserRegistry {
             saved.setProperty("username", name);
             saved.setProperty("password", account.password);
             saved.setProperty("ip", account.ip == null ? "" : account.ip);
-            saved.setProperty("login", account.login == null ? "" : account.login.toString());
-            saved.setProperty("logout", account.logout == null ? "" : account.logout.toString());
+            saved.setProperty("created", formatTime(account.created));
+            saved.setProperty("status", activeSessions.containsKey(name) ? "Dang dang nhap"
+                    : account.login == null ? "Chua dang nhap"
+                    : account.logout == null ? "Khong co phien dang nhap tren server hien tai" : "Da dang xuat");
+            saved.setProperty("login", formatTime(account.login));
+            saved.setProperty("logout", formatTime(account.logout));
             Path temporary = Files.createTempFile(dir, "accounts-", ".tmp");
             try {
-                try (OutputStream output = Files.newOutputStream(temporary)) { saved.store(output, "Server-Client Chat account - plain text password"); }
+                try (ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+                    saved.store(output, "Thong tin tai khoan - gio Viet Nam GMT+07:00; created: ngay tao; login: dang nhap; logout: dang xuat");
+                    Files.writeString(temporary, output.toString(java.nio.charset.StandardCharsets.ISO_8859_1).replace("\\:", ":"));
+                }
                 try { Files.move(temporary, dir.resolve("accounts.txt"), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
                 catch (AtomicMoveNotSupportedException e) { Files.move(temporary, dir.resolve("accounts.txt"), StandardCopyOption.REPLACE_EXISTING); }
             } finally { Files.deleteIfExists(temporary); }
@@ -149,5 +161,19 @@ public final class UserRegistry {
     }
 
     /** Chuyển chuỗi thời gian ISO trong file dữ liệu thành Instant; chuỗi rỗng là null. */
-    private static Instant parseTime(String value) { return value.isBlank() ? null : Instant.parse(value); }
+    private static final java.time.format.DateTimeFormatter TIME = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+    private static final java.time.format.DateTimeFormatter READ_TIME = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss[.SSSSSSSSS]");
+    private static final java.time.ZoneId ZONE = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+
+    private static String formatTime(Instant value) {
+        return value == null ? "Chua ghi nhan" : TIME.format(value.atZone(ZONE)) + " (GMT+07:00)";
+    }
+
+    private static Instant parseTime(String value) {
+        if (value.isBlank() || value.equals("Chua ghi nhan")) return null;
+        if (value.endsWith(" (GMT+07:00)")) {
+            return java.time.LocalDateTime.parse(value.replace(" (GMT+07:00)", ""), READ_TIME).atZone(ZONE).toInstant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        }
+        return Instant.parse(value).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+    }
 }

@@ -1,0 +1,260 @@
+Index: src/main/java/com/p2pchat/p2pchat/DiscoveryServer.java
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>package com.p2pchat.p2pchat;\r\n\r\nimport java.io.BufferedReader;\r\nimport java.io.IOException;\r\nimport java.io.InputStreamReader;\r\nimport java.io.PrintWriter;\r\nimport java.net.ServerSocket;\r\nimport java.net.Socket;\r\nimport java.util.Map;\r\nimport java.util.concurrent.ConcurrentHashMap;\r\n\r\n/**\r\n * Discovery Server trung tâm (Hybrid P2P).\r\n * Chỉ đăng ký / LIST / FIND / LOGOUT — KHÔNG relay tin nhắn hay file.\r\n */\r\npublic class DiscoveryServer {\r\n\r\n    private static final int PORT = 2005;\r\n\r\n    // username -> \"ip:peerPort\"\r\n    private static final Map<String, String> peers = new ConcurrentHashMap<>();\r\n\r\n    public static void main(String[] args) {\r\n        // LẬP TRÌNH MẠNG:\r\n        // ServerSocket mở TCP port 2005 trên máy này.\r\n        // Peer khác kết nối tới IPv4 của máy Server tại port 2005 để đăng ký / tìm peer.\r\n        // Discovery Server chỉ giúp tìm địa chỉ; sau đó chat/file đi trực tiếp Peer ↔ Peer.\r\n        try (ServerSocket serverSocket = new ServerSocket(PORT)) {\r\n            System.out.println(\"Discovery Server dang lang nghe port \" + PORT);\r\n \r\n            // Vòng lặp chính của Discovery Server dùng để liên tục lắng nghe và chấp nhận các kết nối từ peer mới.\r\n            while (true) {\r\n                // accept() là lệnh blocking, sẽ dừng lại tại đây cho đến khi có một peer khác kết nối tới port 2005 của server.\r\n                // Mỗi khi có peer mới kết nối vào, server sẽ nhận về một Socket để tương tác với peer đó.\r\n                Socket clientSocket = serverSocket.accept();\r\n                System.out.println(\"Peer ket noi: \" + clientSocket.getInetAddress().getHostAddress());\r\n\r\n                // Sau khi có kết nối, server sẽ tạo một Thread riêng để xử lý trao đổi với peer mới này (hàm handleClient).\r\n                // Như vậy server có thể tiếp tục accept() các kết nối khác song song, không bị block bởi việc trao đổi dữ liệu với 1 peer duy nhất.\r\n                Thread clientThread = new Thread(() -> handleClient(clientSocket));\r\n                clientThread.start();\r\n            }\r\n        } catch (IOException e) {\r\n            System.err.println(\"Loi Server: \" + e.getMessage());\r\n        }\r\n    }\r\n\r\n    private static void handleClient(Socket socket) {\r\n        // LẬP TRÌNH MẠNG:\r\n        // InputStream đọc dữ liệu Peer gửi tới Server.\r\n        // OutputStream ghi phản hồi từ Server về Peer.\r\n        // BufferedReader/PrintWriter làm việc theo dòng text (protocol dạng REGISTER|...).\r\n        try (\r\n                BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));\r\n                PrintWriter out = new PrintWriter(socket.getOutputStream(), true)\r\n        ) {\r\n            String line;\r\n            // LẬP TRÌNH MẠNG:\r\n            // readLine() chặn thread cho tới khi nhận đủ một dòng (kết thúc bằng \\n).\r\n            // Nếu chạy trên UI thread sẽ làm giao diện đơ — ở đây chạy trên thread riêng nên an toàn.\r\n            // Vòng lặp while này liên tục đọc từng dòng dữ liệu do Peer gửi tới server qua kết nối socket.\r\n            // Mỗi khi nhận được một dòng (kết thúc bằng '\\n'), server sẽ xử lý dòng lệnh đó và gửi phản hồi lại cho Peer.\r\n            // Khi kết nối bị đóng hoặc Peer ngắt kết nối (readLine trả về null), vòng lặp dừng lại và thread này sẽ kết thúc.\r\n            while ((line = in.readLine()) != null) {\r\n                System.out.println(\"Nhan: \" + line);\r\n                String response = processCommand(line, socket);\r\n                // LẬP TRÌNH MẠNG:\r\n                // println ghi dòng phản hồi về Peer; autoFlush=true nên không cần flush thủ công.\r\n                out.println(response);\r\n            }\r\n        } catch (IOException e) {\r\n            System.err.println(\"Mat ket noi Peer: \" + e.getMessage());\r\n        } finally {\r\n            try {\r\n                socket.close();\r\n            } catch (IOException ignored) {\r\n            }\r\n        }\r\n    }\r\n\r\n    // Hàm xử lý lệnh (command) từ peer gửi tới server qua socket.\r\n    // Dòng lệnh được tách thành các phần bằng dấu \"|\" để xác định loại lệnh và các tham số truyền kèm.\r\n    // socket dùng để lấy thông tin mạng của peer (ip address thực tế).\r\n    private static String processCommand(String line, Socket socket) {\r\n        // Tách dòng lệnh thành các phần, dùng \"|\" làm ký tự phân cách; tham số -1 đảm bảo giữ các phần rỗng nếu có.\r\n        String[] parts = line.split(\"\\\\|\", -1);\r\n        if (parts.length == 0) {\r\n            // Nếu không có phần nào, trả về thông báo lỗi (lệnh rỗng).\r\n            return \"ERROR|Empty command\";\r\n        }\r\n\r\n        String cmd = parts[0].trim().toUpperCase();\r\n\r\n        switch (cmd) {\r\n            case \"REGISTER\" -> {\r\n                // REGISTER|username|peerPort\r\n                if (parts.length < 3) {\r\n                    return \"ERROR|REGISTER can username|peerPort\";\r\n                }\r\n                String username = parts[1].trim();\r\n                String peerPort = parts[2].trim();\r\n\r\n                // LẬP TRÌNH MẠNG:\r\n                // IPv4 lấy từ socket kết nối thực tế, không tin Peer tự gửi IP.\r\n                // getInetAddress() là địa chỉ máy Peer nhìn từ phía Server trên LAN.\r\n                String ip = socket.getInetAddress().getHostAddress();\r\n                peers.put(username, ip + \":\" + peerPort);\r\n                System.out.println(\"Dang ky: \" + username + \" -> \" + ip + \":\" + peerPort);\r\n                return \"OK|REGISTERED|\" + username;\r\n            }\r\n            case \"LIST\" -> {\r\n                if (peers.isEmpty()) {\r\n                    return \"LIST|EMPTY\";\r\n                }\r\n                // Duyệt qua từng phần tử (entry) trong Map peers.\r\n                // Mỗi entry có kiểu Map.Entry<String, String> với e.getKey() là username, e.getValue() là \"ip:port\" của peer.\r\n                StringBuilder sb = new StringBuilder(\"LIST\");\r\n                for (Map.Entry<String, String> e : peers.entrySet()) {\r\n                    // Ghép username và ip:port thành chuỗi username@ip:port và nối vào kết quả trả về.\r\n                    sb.append(\"|\").append(e.getKey()).append(\"@\").append(e.getValue());\r\n                }\r\n                return sb.toString();\r\n  \r\n            }\r\n            case \"FIND\" -> {\r\n                // FIND|username\r\n                if (parts.length < 2) {\r\n                    return \"ERROR|can not find username\";\r\n                }\r\n                String target = parts[1].trim();\r\n                String info = peers.get(target);\r\n                if (info == null) {\r\n                    return \"ERROR|NOT_FOUND|\" + target;\r\n                }\r\n                String[] ipPort = info.split(\":\", 2);\r\n                return \"PEER|\" + target + \"|\" + ipPort[0] + \"|\" + ipPort[1];\r\n            }\r\n            case \"LOGOUT\" -> {\r\n                // LOGOUT|username\r\n                if (parts.length < 2) {\r\n                    return \"ERROR|LOGOUT can username\";\r\n                }\r\n                String username = parts[1].trim();\r\n                peers.remove(username);\r\n                System.out.println(\"Logout: \" + username);\r\n                return \"OK|LOGOUT|\" + username;\r\n            }\r\n            default -> {\r\n                return \"ERROR|Unknown command|\" + cmd;\r\n            }\r\n        }\r\n    }\r\n}\r\n
+===================================================================
+diff --git a/src/main/java/com/p2pchat/p2pchat/DiscoveryServer.java b/src/main/java/com/p2pchat/p2pchat/DiscoveryServer.java
+--- a/src/main/java/com/p2pchat/p2pchat/DiscoveryServer.java	(revision ce4cddd674ed98956349273a38a091f4a53905dc)
++++ b/src/main/java/com/p2pchat/p2pchat/DiscoveryServer.java	(date 1789714556355)
+@@ -10,142 +10,211 @@
+ import java.util.concurrent.ConcurrentHashMap;
+ 
+ /**
+- * Discovery Server trung tâm (Hybrid P2P).
+- * Chỉ đăng ký / LIST / FIND / LOGOUT — KHÔNG relay tin nhắn hay file.
++ * Server khám phá peer trong mô hình Hybrid P2P (P2P lai).
++ * Các peer đăng ký và tra cứu địa chỉ qua server trung tâm này;
++ * việc gửi tin nhắn/file sau đó diễn ra trực tiếp giữa các peer.
++ *
++ * Giao thức là văn bản: mỗi yêu cầu/phản hồi nằm trên một dòng,
++ * các trường cách nhau bằng dấu |.
++ * Các lệnh được hỗ trợ: REGISTER, LIST, FIND và LOGOUT.
+  */
++// public cho phép truy cập class từ bên ngoài package.
+ public class DiscoveryServer {
+ 
++    // private: chỉ dùng trong class; static: thuộc class, không cần tạo đối tượng.
++    // final: không thể gán lại; int: số nguyên; 2005 là cổng TCP của discovery server.
+     private static final int PORT = 2005;
+ 
+-    // username -> "ip:peerPort"
++    // Bảng dùng chung cho mọi thread: username -> "ip:peerPort".
++    // Ví dụ: "An" -> "192.168.1.10:5000"; peerPort là cổng peer nhận kết nối P2P.
++    // ConcurrentHashMap bảo vệ các thao tác riêng lẻ như put/get/remove khi chạy đồng thời.
++    // final chỉ cố định tham chiếu peers; nội dung Map vẫn thêm, sửa, xóa được.
++    // Dữ liệu chỉ nằm trong RAM, mất khi tiến trình server kết thúc.
+     private static final Map<String, String> peers = new ConcurrentHashMap<>();
+ 
++    // Điểm bắt đầu chương trình: JVM gọi main mà không cần tạo DiscoveryServer.
++    // void nghĩa là không trả kết quả; args chứa tham số dòng lệnh (ở đây không dùng).
+     public static void main(String[] args) {
+-        // LẬP TRÌNH MẠNG:
+-        // ServerSocket mở TCP port 2005 trên máy này.
+-        // Peer khác kết nối tới IPv4 của máy Server tại port 2005 để đăng ký / tìm peer.
+-        // Discovery Server chỉ giúp tìm địa chỉ; sau đó chat/file đi trực tiếp Peer ↔ Peer.
++        // Mở cổng TCP 2005 để chờ peer kết nối.
++        // try-with-resources tự đóng serverSocket khi rời khối try, kể cả khi có lỗi.
+         try (ServerSocket serverSocket = new ServerSocket(PORT)) {
++            // In thông báo khởi động; dấu + nối chuỗi với giá trị PORT.
+             System.out.println("Discovery Server dang lang nghe port " + PORT);
+- 
+-            // Vòng lặp chính của Discovery Server dùng để liên tục lắng nghe và chấp nhận các kết nối từ peer mới.
++
++            // Lặp liên tục để tiếp nhận nhiều kết nối; vòng lặp không có điểm dừng chủ động.
+             while (true) {
+-                // accept() là lệnh blocking, sẽ dừng lại tại đây cho đến khi có một peer khác kết nối tới port 2005 của server.
+-                // Mỗi khi có peer mới kết nối vào, server sẽ nhận về một Socket để tương tác với peer đó.
++                // accept() chặn thread hiện tại cho đến khi có kết nối hoặc phát sinh lỗi.
++                // Socket trả về chỉ phục vụ peer vừa kết nối; serverSocket vẫn lắng nghe.
+                 Socket clientSocket = serverSocket.accept();
++                // Lấy địa chỉ IP đầu bên kia của kết nối và in ra màn hình.
+                 System.out.println("Peer ket noi: " + clientSocket.getInetAddress().getHostAddress());
+ 
+-                // Sau khi có kết nối, server sẽ tạo một Thread riêng để xử lý trao đổi với peer mới này (hàm handleClient).
+-                // Như vậy server có thể tiếp tục accept() các kết nối khác song song, không bị block bởi việc trao đổi dữ liệu với 1 peer duy nhất.
++                // Tạo một thread riêng cho peer này.
++                // Lambda () -> ... mô tả công việc thread sẽ thực hiện: gọi handleClient.
+                 Thread clientThread = new Thread(() -> handleClient(clientSocket));
++                // Khởi chạy thread mới để main có thể quay lại accept() peer tiếp theo.
+                 clientThread.start();
+             }
+         } catch (IOException e) {
++            // Bắt lỗi mở cổng hoặc chấp nhận kết nối; sau khối này main kết thúc.
++            // System.err là luồng báo lỗi; getMessage() lấy mô tả lỗi.
+             System.err.println("Loi Server: " + e.getMessage());
+         }
+     }
+ 
++    /**
++     * Phục vụ nhiều lệnh liên tiếp trên cùng một kết nối TCP.
++     * Mỗi lần gọi chạy trên thread riêng được tạo trong main.
++     * @param socket kết nối với peer đang được phục vụ
++     */
+     private static void handleClient(Socket socket) {
+-        // LẬP TRÌNH MẠNG:
+-        // InputStream đọc dữ liệu Peer gửi tới Server.
+-        // OutputStream ghi phản hồi từ Server về Peer.
+-        // BufferedReader/PrintWriter làm việc theo dòng text (protocol dạng REGISTER|...).
++        // try-with-resources tự đóng các bộ đọc/ghi khi kết thúc xử lý kết nối.
+         try (
++                // getInputStream(): nhận byte; InputStreamReader: giải mã thành ký tự
++                // bằng charset mặc định; BufferedReader: đệm dữ liệu và cung cấp readLine().
+                 BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()));
++                // getOutputStream(): gửi byte; PrintWriter: ghi văn bản bằng charset mặc định.
++                // true bật autoFlush: println() đẩy dữ liệu đang đệm xuống luồng ngay.
+                 PrintWriter out = new PrintWriter(socket.getOutputStream(), true)
+         ) {
++            // Biến lưu dòng lệnh vừa đọc từ peer.
+             String line;
+-            // LẬP TRÌNH MẠNG:
+-            // readLine() chặn thread cho tới khi nhận đủ một dòng (kết thúc bằng \n).
+-            // Nếu chạy trên UI thread sẽ làm giao diện đơ — ở đây chạy trên thread riêng nên an toàn.
+-            // Vòng lặp while này liên tục đọc từng dòng dữ liệu do Peer gửi tới server qua kết nối socket.
+-            // Mỗi khi nhận được một dòng (kết thúc bằng '\n'), server sẽ xử lý dòng lệnh đó và gửi phản hồi lại cho Peer.
+-            // Khi kết nối bị đóng hoặc Peer ngắt kết nối (readLine trả về null), vòng lặp dừng lại và thread này sẽ kết thúc.
++            // Đọc và gán vào line, rồi kiểm tra khác null để tiếp tục xử lý.
++            // readLine() chờ dấu kết thúc dòng (LF, CR hoặc CRLF), EOF hoặc lỗi I/O;
++            // dòng trả về không chứa dấu kết thúc dòng. EOF vẫn có thể trả dòng cuối còn dở.
++            // null nghĩa là đã hết luồng và không còn ký tự nào để đọc.
+             while ((line = in.readLine()) != null) {
++                // Ghi log nguyên dòng yêu cầu vừa nhận.
+                 System.out.println("Nhan: " + line);
++                // Phân tích lệnh và tạo phản hồi; truyền socket để có thể lấy IP peer.
+                 String response = processCommand(line, socket);
+-                // LẬP TRÌNH MẠNG:
+-                // println ghi dòng phản hồi về Peer; autoFlush=true nên không cần flush thủ công.
++                // Gửi phản hồi kèm dấu kết thúc dòng để peer có thể đọc bằng readLine().
+                 out.println(response);
+             }
+         } catch (IOException e) {
++            // Báo lỗi khi tạo luồng, đọc hoặc đóng tài nguyên.
++            // PrintWriter thường giữ trạng thái lỗi ghi nội bộ thay vì ném IOException.
+             System.err.println("Mat ket noi Peer: " + e.getMessage());
+         } finally {
++            // Luôn đi qua phần dọn dẹp khi rời try/catch, dù đọc hết luồng hay gặp lỗi.
+             try {
++                // Đóng socket và các luồng gắn với nó; đóng lại socket đã đóng là hợp lệ.
++                // Đóng kết nối không tự xóa mục đăng ký của peer trong Map.
+                 socket.close();
+             } catch (IOException ignored) {
++                // Chủ động bỏ qua lỗi đóng socket; ignored là tên biến ngoại lệ không dùng.
+             }
+         }
+     }
+ 
+-    // Hàm xử lý lệnh (command) từ peer gửi tới server qua socket.
+-    // Dòng lệnh được tách thành các phần bằng dấu "|" để xác định loại lệnh và các tham số truyền kèm.
+-    // socket dùng để lấy thông tin mạng của peer (ip address thực tế).
++    /**
++     * Phân tích và thực hiện một lệnh; hàm này chỉ trả chuỗi, không tự gửi qua mạng.
++     * @param line dòng yêu cầu từ peer
++     * @param socket kết nối dùng để xác định IP khi đăng ký
++     * @return một dòng phản hồi theo giao thức của ứng dụng
++     */
+     private static String processCommand(String line, Socket socket) {
+-        // Tách dòng lệnh thành các phần, dùng "|" làm ký tự phân cách; tham số -1 đảm bảo giữ các phần rỗng nếu có.
++        // split dùng biểu thức chính quy: "\\|" trong mã Java biểu diễn mẫu \|
++        // để khớp dấu | theo nghĩa ký tự, thay vì phép lựa chọn trong regex.
++        // -1 giữ cả trường rỗng ở cuối: "REGISTER|An|" vẫn có 3 phần.
+         String[] parts = line.split("\\|", -1);
++        // Kiểm tra phòng vệ; với cách split này, ngay cả chuỗi rỗng cũng có 1 phần.
++        // Vì vậy lệnh rỗng thực tế sẽ đi vào default ở switch bên dưới.
+         if (parts.length == 0) {
+-            // Nếu không có phần nào, trả về thông báo lỗi (lệnh rỗng).
++            // Kết thúc hàm ngay và trả chuỗi báo lỗi nếu điều kiện trên đúng.
+             return "ERROR|Empty command";
+         }
+ 
++        // Lấy tên lệnh, bỏ khoảng trắng ở hai đầu rồi đổi thành chữ hoa.
++        // Nhờ đó " register " được xử lý như "REGISTER".
+         String cmd = parts[0].trim().toUpperCase();
+ 
++        // Chọn nhánh theo tên lệnh; cú pháp -> không chạy tiếp sang case kế tiếp.
+         switch (cmd) {
+             case "REGISTER" -> {
+-                // REGISTER|username|peerPort
++                // Cú pháp: REGISTER|username|peerPort, ví dụ REGISTER|An|5000.
++                // Cần ít nhất 3 trường; hiện chỉ kiểm tra số trường, chưa xác thực nội dung.
+                 if (parts.length < 3) {
++                    // Báo thiếu tên đăng ký hoặc cổng lắng nghe của peer.
+                     return "ERROR|REGISTER can username|peerPort";
+                 }
++                // Lấy tên peer và bỏ khoảng trắng hai đầu.
+                 String username = parts[1].trim();
++                // Lấy cổng P2P do peer khai báo; ở đây vẫn là chuỗi, chưa kiểm tra số/cận.
+                 String peerPort = parts[2].trim();
+ 
+-                // LẬP TRÌNH MẠNG:
+-                // IPv4 lấy từ socket kết nối thực tế, không tin Peer tự gửi IP.
+-                // getInetAddress() là địa chỉ máy Peer nhìn từ phía Server trên LAN.
++                // Lấy IP đầu bên kia như server nhìn thấy qua kết nối TCP.
++                // IP có thể là IPv4 hoặc IPv6; khi qua NAT có thể là IP của NAT.
+                 String ip = socket.getInetAddress().getHostAddress();
++                // Lưu địa chỉ theo username; nếu tên đã tồn tại, địa chỉ cũ bị ghi đè.
+                 peers.put(username, ip + ":" + peerPort);
++                // Ghi log tên và địa chỉ vừa đăng ký.
+                 System.out.println("Dang ky: " + username + " -> " + ip + ":" + peerPort);
++                // Trả xác nhận, ví dụ OK|REGISTERED|An.
+                 return "OK|REGISTERED|" + username;
+             }
+             case "LIST" -> {
++                // Lệnh LIST không cần tham số: lấy danh sách peer đã đăng ký.
++                // Kiểm tra Map có đang rỗng tại thời điểm gọi hay không.
+                 if (peers.isEmpty()) {
++                    // Phản hồi riêng cho trường hợp chưa có peer.
+                     return "LIST|EMPTY";
+                 }
+-                // Duyệt qua từng phần tử (entry) trong Map peers.
+-                // Mỗi entry có kiểu Map.Entry<String, String> với e.getKey() là username, e.getValue() là "ip:port" của peer.
++                // Dùng StringBuilder để nối nhiều đoạn vào cùng một chuỗi kết quả.
+                 StringBuilder sb = new StringBuilder("LIST");
++                // Duyệt cặp tên - địa chỉ: getKey() là username, getValue() là ip:port.
++                // ConcurrentHashMap không đảm bảo thứ tự; kết quả duyệt có thể phản ánh
++                // một phần cập nhật đồng thời, không phải bản chụp cố định của toàn Map.
+                 for (Map.Entry<String, String> e : peers.entrySet()) {
+-                    // Ghép username và ip:port thành chuỗi username@ip:port và nối vào kết quả trả về.
++                    // Thêm "|username@ip:port"; append trả lại builder để gọi nối tiếp.
+                     sb.append("|").append(e.getKey()).append("@").append(e.getValue());
+                 }
++                // Đổi builder thành String, ví dụ LIST|An@192.168.1.10:5000.
+                 return sb.toString();
+-  
++
+             }
+             case "FIND" -> {
+-                // FIND|username
++                // Cú pháp FIND|username: tìm địa chỉ của một peer theo tên.
++                // Cần trường thứ hai chứa tên cần tìm.
+                 if (parts.length < 2) {
++                    // Báo lỗi thiếu tham số username.
+                     return "ERROR|can not find username";
+                 }
++                // Lấy tên đích, bỏ khoảng trắng hai đầu; tên vẫn phân biệt hoa/thường.
+                 String target = parts[1].trim();
++                // Tra địa chỉ theo tên; get() trả null nếu không có mục tương ứng.
+                 String info = peers.get(target);
++                // Kiểm tra peer có được đăng ký hay không.
+                 if (info == null) {
++                    // Báo không tìm thấy và kèm tên đã tra cứu.
+                     return "ERROR|NOT_FOUND|" + target;
+                 }
++                // Tách "ip:port" tại dấu : đầu tiên thành tối đa 2 phần.
++                // Cách lưu/tách này phù hợp IPv4, không phân tách đúng địa chỉ IPv6 có dấu :.
+                 String[] ipPort = info.split(":", 2);
++                // Trả tên, IP và cổng thành các trường riêng, ví dụ PEER|An|192.168.1.10|5000.
+                 return "PEER|" + target + "|" + ipPort[0] + "|" + ipPort[1];
+             }
+             case "LOGOUT" -> {
+-                // LOGOUT|username
++                // Cú pháp LOGOUT|username: xóa đăng ký theo tên được gửi trong lệnh.
++                // Cần ít nhất 2 trường để lấy username.
+                 if (parts.length < 2) {
++                    // Báo lỗi nếu thiếu trường tên.
+                     return "ERROR|LOGOUT can username";
+                 }
++                // Lấy tên cần xóa và bỏ khoảng trắng hai đầu.
+                 String username = parts[1].trim();
++                // Xóa mục theo tên; nếu không tồn tại thì Map không thay đổi.
++                // Hiện không đối chiếu tên này với chủ sở hữu socket gửi lệnh.
+                 peers.remove(username);
++                // Ghi log yêu cầu đăng xuất.
+                 System.out.println("Logout: " + username);
++                // Luôn trả OK khi đủ trường, kể cả tên chưa tồn tại.
++                // Lệnh này chỉ xóa đăng ký; vòng đọc lệnh vẫn tiếp tục trên cùng socket.
+                 return "OK|LOGOUT|" + username;
+             }
+             default -> {
++                // Mọi tên lệnh không khớp các case trên đều nhận phản hồi lỗi.
+                 return "ERROR|Unknown command|" + cmd;
+             }
+         }
