@@ -51,7 +51,7 @@ public final class ClientView extends BorderPane {
     final Button backButton = button("← Quay lại", "secondary");
     final TextArea message = new TextArea();
     final Button send = button("Gửi →", "primary");
-    final Button attach = button("📎  Tệp", "attach-button");
+    final Button attach = button("📎  Tệp cho tất cả", "attach-button");
     final Label notice = label("", "notice");
     final Label loginError = label("", "login-error");
     final Label roomTitle = label("Trò chuyện", "section-title");

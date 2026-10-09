@@ -6,7 +6,7 @@
 
 - **Kết nối** trên màn hình login chỉ kiểm tra IP/cổng có nhận kết nối TCP hay không. Socket kiểm tra được đóng ngay sau đó; thao tác này không đăng nhập, không đưa người dùng vào danh sách online.
 - **Đăng nhập / Đăng ký** tạo phiên TCP đã xác thực với server. Đăng ký thành công sẽ vào màn hình chat. Người dùng xuất hiện trong danh sách online nhưng chưa tham gia multicast.
-- Bấm **Phòng chung** để xem text và tệp chung. Chỉ khi bấm **Tham gia phòng** client mới nhận/gửi text multicast. Tệp broadcast được nhận từ lúc đăng nhập, không cần tham gia nhóm.
+- Bấm **Phòng chung** để xem text nhóm. Chỉ khi bấm **Tham gia phòng** client mới nhận/gửi text multicast. Mọi tệp đều gửi cho tất cả client từ bất kỳ màn hình chat nào; nhận từ lúc đăng nhập, không cần tham gia nhóm.
 - **Rời phòng** đóng socket multicast; người dùng vẫn online, chat riêng và nhận/gửi tệp broadcast được.
 - **Đăng xuất**, đóng client hoặc mất kết nối server kết thúc phiên TCP, rời multicast và đóng dịch vụ tệp broadcast.
 
@@ -26,9 +26,9 @@
 - Kiểm tra kết nối server với trạng thái đang kết nối, thành công hoặc thất bại.
 - Đăng ký có xác nhận mật khẩu; ô mật khẩu là ô chữ thường nên luôn hiển thị nội dung đang nhập.
 - Danh sách online tự cập nhật, có tìm kiếm và làm mới; danh sách không bao gồm chính mình.
-- Chat riêng, gửi file riêng tới người online qua server.
+- Chat riêng qua server. Mọi thao tác gửi tệp trên giao diện đều gửi cho tất cả client đang đăng nhập trong cùng LAN, kể cả khi đang mở chat riêng.
 - Tham gia/rời phòng chung, nhắn tin multicast, nhận thông báo người vào/ra và lọc tin trùng.
-- Gửi file riêng hoặc nhóm bằng nút **Tệp**, hoặc kéo thả vào vùng chat; mỗi lần xử lý tệp đầu tiên được thả.
+- Gửi tệp bằng nút **Tệp cho tất cả**, hoặc kéo thả vào vùng chat; không cần chọn người nhận hay tham gia nhóm. Mỗi lần xử lý tệp đầu tiên được thả.
 - File nhận tự lưu, có nút **Mở tệp** và **Thư mục**.
 - Bong bóng tin nhắn có tên và giờ; mỗi cuộc trò chuyện giữ lịch sử và bản nháp riêng trong bộ nhớ. Đăng nhập phiên mới xóa lịch sử giao diện.
 - **Enter** gửi tin; **Shift+Enter** xuống dòng.
@@ -39,7 +39,7 @@
 Đăng ký / đăng nhập / danh sách online:
 Client ── TCP ── Server
 
-Tin nhắn và file riêng:
+Tin nhắn riêng:
 Client A ── TCP ── Server ── TCP ── Client B
 
 Tin nhắn nhóm, JOIN, LEAVE:
@@ -65,7 +65,7 @@ Client nhận ── TCP trực tiếp tới cổng tạm của client gửi ─
 
 TCP dùng khung nhị phân `CHT3`: độ dài khung, lgit add .oại lệnh, request ID, các trường chuỗi và dữ liệu file. Các lệnh client gửi là `LOGIN`, `SIGNUP`, `LIST`, `MESSAGE`, `FILE`; server trả `AUTHENTICATED`, `USERS`, `OK`, `ERROR` và chuyển tiếp `MESSAGE`/`FILE`. Đăng xuất đóng socket TCP. Client có luồng đọc riêng và timeout chờ phản hồi; server khóa luồng ghi của mỗi kết nối để tin nhắn và file không xen lẫn.
 
-UDP multicast dùng `JOIN|username`, `LEAVE|username`, `MESSAGE|username|timestamp|content`. UDP broadcast dùng `FILE_OFFER` chứa người gửi, token UUID, cổng TCP tạm, kích thước và tên file mã hóa Base64. Mọi client đăng nhập trong cùng mạng broadcast tự tải và lưu tệp, dù chưa tham gia hoặc đã rời nhóm. Tệp hiển thị trong Phòng chung. Token có hiệu lực 10 phút; mỗi client giữ tối đa 32 file chia sẻ chưa hết hạn. Người gửi cần giữ file nguồn và tiếp tục đăng nhập trong lúc người nhận tải.
+UDP multicast dùng `JOIN|username`, `LEAVE|username`, `MESSAGE|username|timestamp|content`. UDP broadcast dùng `FILE_OFFER` chứa người gửi, token UUID, cổng TCP tạm, kích thước và tên file mã hóa Base64. Mọi client đăng nhập trong cùng mạng broadcast tự tải và lưu tệp, dù chưa tham gia hoặc đã rời nhóm. Tệp hiển thị ở mọi màn hình trò chuyện, kể cả chat riêng và màn hình chưa chọn người dùng. A đang chat với B mà gửi tệp thì C và mọi client khác cũng nhận; text riêng vẫn chỉ tới B. Token có hiệu lực 10 phút; mỗi client giữ tối đa 32 file chia sẻ chưa hết hạn. Người gửi cần giữ file nguồn và tiếp tục đăng nhập trong lúc người nhận tải.
 
 ## 4. Cấu trúc mã nguồn
 

@@ -211,7 +211,7 @@ sequenceDiagram
     participant Receiver as Client nhan
 
     Note over Ctrl,Receiver: Bat nghe broadcast tu luc dang nhap, khong can tham gia nhom
-    Sender->>Ctrl: Chon Tep cho tat ca trong Phong chung
+    Sender->>Ctrl: Chon Tep cho tat ca o bat ky man hinh chat nao
     Ctrl->>Mcast: guiTep(file)
     Mcast->>FileSender: taoThongBaoChiaSe(file)
     FileSender->>FileSender: tao token, luu Shared va mo listener port tam

@@ -32,6 +32,7 @@ public final class ClientController implements AutoCloseable {
     private BroadcastFileService broadcastFiles;
     private long fileSession;
     private final Map<String, List<ChatMessage>> conversations = new HashMap<>();
+    private final List<ChatMessage> broadcastHistory = new ArrayList<>();
     private final Map<String, String> drafts = new HashMap<>();
     private List<String> online = List.of();
     private String active;
@@ -145,7 +146,7 @@ public final class ClientController implements AutoCloseable {
         view.backButton.setOnAction(event -> {
             active = null;
             view.users.getSelectionModel().clearSelection();
-            view.showConversation(List.of());
+            render();
             update();
         });
 
@@ -223,28 +224,25 @@ public final class ClientController implements AutoCloseable {
     }
 
     private void nhanTepBroadcast(ChatMessage item) {
-        List<ChatMessage> history = conversations.computeIfAbsent(ChatMessage.GROUP, ignored -> new ArrayList<>());
-        history.add(item);
-        if (history.size() > 500) history.removeFirst();
-        if (Objects.equals(active, ChatMessage.GROUP)) render();
-        if (!item.outgoing()) view.showNotice("Đã nhận tệp từ " + item.sender() + ". Mở Phòng chung để xem tệp.");
+        broadcastHistory.add(item);
+        if (broadcastHistory.size() > 500) broadcastHistory.removeFirst();
+        render();
+        if (!item.outgoing()) view.showNotice("Đã nhận tệp gửi cho tất cả từ " + item.sender() + ".");
     }
 
-    /** File chung phát broadcast cho mọi client; file riêng gửi qua TCP server. */
+    /** Mọi tệp đều phát broadcast cho tất cả client, bất kể cuộc trò chuyện đang chọn. */
     private void guiTep(File file) {
-        if (file == null || active == null || view.attach.isDisabled()) return;
+        if (file == null || view.attach.isDisabled()) return;
         sending = true;
-        String destination = active;
         BroadcastFileService fileService = broadcastFiles;
         update();
-        CompletableFuture<Void> operation = ChatMessage.GROUP.equals(destination)
-                ? CompletableFuture.runAsync(() -> {
+        CompletableFuture<Void> operation = CompletableFuture.runAsync(() -> {
                     try {
                         if (fileService == null) throw new IOException("Dịch vụ tệp broadcast chưa sẵn sàng.");
                         fileService.guiTep(file);
                     }
                     catch (IOException e) { throw new java.util.concurrent.CompletionException(e); }
-                }) : client.guiTep(destination, file);
+                });
         operation.whenComplete((unused, error) -> Platform.runLater(() -> {
             sending = false;
             if (error != null) baoLoi(error);
@@ -300,7 +298,7 @@ public final class ClientController implements AutoCloseable {
             Authentication.kiemTraDangNhap(host, port, loginName, password);
             if (signUp) Authentication.kiemTraNhapLaiMatKhau(password, view.confirmPassword.getText());
             serverAddress = host + ":" + port;
-            conversations.clear(); drafts.clear(); active = null;
+            conversations.clear(); broadcastHistory.clear(); drafts.clear(); active = null;
             view.message.clear();
             view.showConversation(List.of());
             view.showNotice("");
@@ -343,7 +341,12 @@ public final class ClientController implements AutoCloseable {
     }
 
     /** Vẽ lại lịch sử tin nhắn của cuộc trò chuyện đang mở. */
-    private void render() { view.showConversation(conversations.getOrDefault(active, List.of())); }
+    private void render() {
+        List<ChatMessage> visible = new ArrayList<>(conversations.getOrDefault(active, List.of()));
+        visible.addAll(broadcastHistory);
+        visible.sort(Comparator.comparing(ChatMessage::time));
+        view.showConversation(visible);
+    }
 
     /** Bật/tắt nút gửi, file, refresh, phòng nhóm theo trạng thái kết nối hiện tại. */
     private void update() {
@@ -355,9 +358,7 @@ public final class ClientController implements AutoCloseable {
         view.groupAction.setDisable(!connected || joining);
         view.leaveGroupHeader.setDisable(!connected || joining);
         view.send.setDisable(!available || sending);
-        view.attach.setDisable(sending || !connected || active == null
-                || (isGroup ? broadcastFiles == null : !online.contains(active)));
-        view.attach.setText(isGroup ? "📎  Tệp cho tất cả" : "📎  Tệp");
+        view.attach.setDisable(sending || !connected || broadcastFiles == null);
         view.message.setDisable(!available || sending);
         view.refresh.setDisable(!connected);
 

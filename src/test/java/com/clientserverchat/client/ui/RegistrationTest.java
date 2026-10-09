@@ -6,6 +6,8 @@
 package com.clientserverchat.client.ui;
 
 import com.clientserverchat.client.core.ChatClient;
+import com.clientserverchat.client.core.BroadcastFileService;
+import com.clientserverchat.client.core.ChatMessage;
 import com.clientserverchat.server.core.ChatServer;
 import com.clientserverchat.server.core.UserRegistry;
 import javafx.application.Platform;
@@ -15,6 +17,7 @@ import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.nio.file.Files;
 import java.util.concurrent.*;
 import java.util.function.BooleanSupplier;
 
@@ -118,6 +121,8 @@ class RegistrationTest {
             assertEquals("", view.password.getText());
             assertEquals("", view.confirmPassword.getText());
             assertFalse(view.connect.isDisabled());
+            assertFalse(view.attach.isDisabled()); // Chưa chọn cuộc trò chuyện vẫn gửi tệp được.
+            assertEquals("📎  Tệp cho tất cả", view.attach.getText());
             view.groupRoom.fire();
             assertEquals("○ Chưa tham gia", view.roomStatus.getText());
             assertEquals("Tham gia phòng", view.groupAction.getText());
@@ -127,6 +132,37 @@ class RegistrationTest {
         });
         assertEquals(1, registry.danhSachNguoiDung().size());
         assertTrue(registry.danhSachNguoiDung().getFirst().online());
+    }
+
+    /** Kiểm tra tài khoản trùng báo lỗi server và người dùng có thể đổi tên để đăng ký lại. */
+    @Test void fileSentFromPrivateChatAlsoReachesAnotherClient() throws Exception {
+        BlockingQueue<ChatMessage> outside = new LinkedBlockingQueue<>();
+        BlockingQueue<String> errors = new LinkedBlockingQueue<>();
+        try (ChatClient bob = new ChatClient(directory);
+             BroadcastFileService charlie = new BroadcastFileService("OutsideCharlie", null, outside::add, errors::add)) {
+            bob.dangKi("127.0.0.1", server.getPort(), "PrivateBob", "Secret123!").get(5, TimeUnit.SECONDS);
+            fx(() -> view.connect.fire());
+            awaitUi(() -> view.getCenter() != loginPage && view.users.getItems().contains("PrivateBob"));
+            byte[] bytes = "Tệp dành cho tất cả client".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            Path source = Files.write(directory.resolve("broadcast-from-private.txt"), bytes);
+            fx(() -> {
+                view.users.getSelectionModel().select("PrivateBob");
+                assertEquals("PrivateBob", view.roomTitle.getText());
+                assertEquals("📎  Tệp cho tất cả", view.attach.getText());
+                assertFalse(view.attach.isDisabled());
+                try {
+                    var sendFile = ClientController.class.getDeclaredMethod("guiTep", java.io.File.class);
+                    sendFile.setAccessible(true);
+                    sendFile.invoke(controller, source.toFile());
+                } catch (ReflectiveOperationException e) { throw new RuntimeException(e); }
+            });
+            ChatMessage received = outside.poll(5, TimeUnit.SECONDS);
+            assertNotNull(received, "C phải nhận tệp dù A đang mở chat riêng với B");
+            Path saved = Path.of(received.content().split("\nĐã lưu: ", 2)[1]);
+            try { assertArrayEquals(bytes, Files.readAllBytes(saved)); }
+            finally { Files.deleteIfExists(saved); }
+            assertTrue(errors.isEmpty(), errors.toString());
+        }
     }
 
     /** Kiểm tra tài khoản trùng báo lỗi server và người dùng có thể đổi tên để đăng ký lại. */

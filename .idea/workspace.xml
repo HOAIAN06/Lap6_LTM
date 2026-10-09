@@ -11,11 +11,8 @@
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/docs/sequence-diagram.md" beforeDir="false" afterPath="$PROJECT_DIR$/docs/sequence-diagram.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/clientserverchat/client/core/GroupFileTransfer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/clientserverchat/client/core/GroupFileTransfer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/com/clientserverchat/client/core/MulticastChatService.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/clientserverchat/client/core/MulticastChatService.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/clientserverchat/client/ui/ClientController.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/clientserverchat/client/ui/ClientController.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/com/clientserverchat/client/ui/ClientView.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/com/clientserverchat/client/ui/ClientView.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/com/clientserverchat/client/core/MulticastChatServiceTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/clientserverchat/client/core/MulticastChatServiceTest.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/test/java/com/clientserverchat/client/ui/RegistrationTest.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/com/clientserverchat/client/ui/RegistrationTest.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -104,23 +101,23 @@
   </component>
   <component name="NextEditCompletionFeaturesState">
     <decayedCancelled>
-      <entry key="MS100" value="1.9410527219612166" />
-      <entry key="MS500" value="4.440320172041581" />
-      <entry key="S2" value="11.513938077732686" />
-      <entry key="S5" value="19.524640354117718" />
-      <entry key="S10" value="25.101560042143994" />
-      <entry key="S30" value="32.118055329220184" />
-      <entry key="S60" value="49.92977288019173" />
-      <entry key="M2" value="94.11553554043547" />
-      <entry key="M5" value="168.33958816694476" />
-      <entry key="M10" value="258.68504444592367" />
-      <entry key="M15" value="370.2517628193787" />
-      <entry key="M30" value="705.4827281760547" />
-      <entry key="H1" value="1139.373208072997" />
-      <entry key="H2" value="1547.2989006194166" />
-      <entry key="H4" value="1861.0945242374394" />
-      <entry key="D1" value="2227.9079332730894" />
-      <entry key="W1" value="2304.7158450965503" />
+      <entry key="MS100" value="1.0" />
+      <entry key="MS500" value="1.00000000008884" />
+      <entry key="S2" value="1.0030756358797284" />
+      <entry key="S5" value="1.1067188859388597" />
+      <entry key="S10" value="1.4032174732693057" />
+      <entry key="S30" value="2.1263087147470525" />
+      <entry key="S60" value="2.5161180056281625" />
+      <entry key="M2" value="3.2528260143238277" />
+      <entry key="M5" value="12.48613072303334" />
+      <entry key="M10" value="51.39667867555012" />
+      <entry key="M15" value="113.89242269378644" />
+      <entry key="M30" value="371.7814861658667" />
+      <entry key="H1" value="831.8200414180216" />
+      <entry key="H2" value="1347.4990963588373" />
+      <entry key="H4" value="1774.7744292950767" />
+      <entry key="D1" value="2294.0398554077815" />
+      <entry key="W1" value="2404.7847238344066" />
     </decayedCancelled>
     <decayedSelected>
       <entry key="MS100" value="0.0" />
@@ -142,23 +139,23 @@
       <entry key="W1" value="0.0" />
     </decayedSelected>
     <decayedShown>
-      <entry key="MS100" value="1.8518484146173222" />
-      <entry key="MS500" value="4.398450093066512" />
-      <entry key="S2" value="11.48614315160232" />
-      <entry key="S5" value="19.505859043376866" />
-      <entry key="S10" value="25.08949277327001" />
-      <entry key="S30" value="32.11292469310101" />
-      <entry key="S60" value="49.92586953370044" />
-      <entry key="M2" value="94.11193117973082" />
-      <entry key="M5" value="168.3370166389412" />
-      <entry key="M10" value="258.6829676959805" />
-      <entry key="M15" value="370.24969194241487" />
-      <entry key="M30" value="705.4806662845227" />
-      <entry key="H1" value="1139.371517739855" />
-      <entry key="H2" value="1547.2977436436177" />
-      <entry key="H4" value="1861.0938243070382" />
-      <entry key="D1" value="2227.9077926508353" />
-      <entry key="W1" value="2304.715824285167" />
+      <entry key="MS100" value="0.9726549474122855" />
+      <entry key="MS500" value="0.9944701687611963" />
+      <entry key="S2" value="1.0016828456566005" />
+      <entry key="S5" value="1.1060588248890466" />
+      <entry key="S10" value="1.402732346829402" />
+      <entry key="S30" value="2.1260135330735497" />
+      <entry key="S60" value="2.515933596304533" />
+      <entry key="M2" value="3.2526988377404282" />
+      <entry key="M5" value="12.485796243721493" />
+      <entry key="M10" value="51.39590706056337" />
+      <entry key="M15" value="113.89137899628767" />
+      <entry key="M30" value="371.78005205417037" />
+      <entry key="H1" value="831.8185789749268" />
+      <entry key="H2" value="1347.4979578710004" />
+      <entry key="H4" value="1774.7736918144417" />
+      <entry key="D1" value="2294.039698281979" />
+      <entry key="W1" value="2404.784700341592" />
     </decayedShown>
   </component>
   <component name="ProjectColorInfo">{
@@ -328,7 +325,7 @@
       <workItem from="1791283220428" duration="1640000" />
       <workItem from="1791284889258" duration="10562000" />
       <workItem from="1791476766250" duration="1647000" />
-      <workItem from="1791528843307" duration="3247000" />
+      <workItem from="1791528843307" duration="5268000" />
     </task>
     <task id="LOCAL-00001" summary="logic">
       <option name="closed" value="true" />
