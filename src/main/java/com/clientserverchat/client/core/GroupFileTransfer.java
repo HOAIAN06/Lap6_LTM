@@ -1,9 +1,9 @@
 /*
  * File: GroupFileTransfer.java
- * Vai trò: Hỗ trợ gửi file trong phòng multicast.
- * Mục đích: Multicast chỉ gửi thông báo FILE_OFFER nhỏ; nội dung file thật được tải qua TCP trực tiếp giữa client.
+ * Vai trò: Hỗ trợ tải tệp được thông báo qua broadcast.
+ * Mục đích: Broadcast gửi FILE_OFFER nhỏ; nội dung file tải qua TCP trực tiếp giữa client.
  * Phương thức chính:
- * - taoThongBaoChiaSe(): tạo token file để phát qua multicast.
+ * - taoThongBaoChiaSe(): tạo token file để phát qua broadcast.
  * - nhanThongBaoChiaSe(): đọc FILE_OFFER và bắt đầu tải file.
  * - phucVuTaiTep()/taiTep(): server tạm gửi file và client nhận file.
  */
@@ -18,7 +18,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 
-/** Multicast advertises a short-lived file token; TCP transfers the actual bytes. */
+/** Broadcast advertises a short-lived file token; TCP transfers the actual bytes. */
 final class GroupFileTransfer implements AutoCloseable {
     /** Thông tin file đang chia sẻ: đường dẫn, kích thước, thời điểm hết hạn token. */
     private record Shared(Path path, long size, long expires) {}
@@ -65,7 +65,7 @@ final class GroupFileTransfer implements AutoCloseable {
                 + Base64.getEncoder().encodeToString(name.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
-    /** Phục vụ một client khác tải file bằng token đã phát qua multicast. */
+    /** Phục vụ một client khác tải file bằng token đã phát qua broadcast. */
     private void phucVuTaiTep(Socket socket) {
         try (socket) {
             socket.setSoTimeout(10_000);
@@ -80,7 +80,7 @@ final class GroupFileTransfer implements AutoCloseable {
         } finally { sockets.remove(socket); }
     }
 
-    /** Nhận FILE_OFFER từ multicast, kiểm tra dữ liệu và tạo tác vụ tải file. */
+    /** Nhận FILE_OFFER từ broadcast, kiểm tra dữ liệu và tạo tác vụ tải file. */
     void nhanThongBaoChiaSe(String payload, InetAddress senderAddress) {
         try {
             String[] parts = payload.split("\\|", 6);

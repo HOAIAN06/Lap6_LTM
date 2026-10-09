@@ -1,14 +1,14 @@
 # Lab 6 — Ứng dụng chat LAN với TCP và UDP Multicast
 
-Ứng dụng Java có giao diện JavaFX cho server và client, nằm trong một project Maven. Server quản lý tài khoản, danh sách online, chat riêng và chuyển file riêng qua TCP. Phòng chung dùng UDP multicast trực tiếp giữa các client; file nhóm được tải bằng kết nối TCP trực tiếp tới người gửi.
+Ứng dụng Java có giao diện JavaFX cho server và client, nằm trong một project Maven. Server quản lý tài khoản, danh sách online, chat riêng và chuyển file riêng qua TCP. Text phòng chung dùng UDP multicast; thông báo tệp chung dùng UDP broadcast cho cả client trong và ngoài nhóm, nội dung tải bằng TCP trực tiếp tới người gửi.
 
 ## 1. Phân biệt kết nối, đăng nhập và tham gia phòng
 
 - **Kết nối** trên màn hình login chỉ kiểm tra IP/cổng có nhận kết nối TCP hay không. Socket kiểm tra được đóng ngay sau đó; thao tác này không đăng nhập, không đưa người dùng vào danh sách online.
 - **Đăng nhập / Đăng ký** tạo phiên TCP đã xác thực với server. Đăng ký thành công sẽ vào màn hình chat. Người dùng xuất hiện trong danh sách online nhưng chưa tham gia multicast.
-- Bấm **Phòng chung** chỉ mở cuộc trò chuyện nhóm. Chỉ khi bấm **Tham gia phòng** client mới join multicast group và nhận tin/file mới của phòng.
-- **Rời phòng** đóng socket multicast và dịch vụ chia sẻ file nhóm; phiên TCP vẫn còn, người dùng vẫn online và vẫn chat riêng được.
-- **Đăng xuất**, đóng client hoặc mất kết nối server sẽ kết thúc phiên TCP và rời phòng chung.
+- Bấm **Phòng chung** để xem text và tệp chung. Chỉ khi bấm **Tham gia phòng** client mới nhận/gửi text multicast. Tệp broadcast được nhận từ lúc đăng nhập, không cần tham gia nhóm.
+- **Rời phòng** đóng socket multicast; người dùng vẫn online, chat riêng và nhận/gửi tệp broadcast được.
+- **Đăng xuất**, đóng client hoặc mất kết nối server kết thúc phiên TCP, rời multicast và đóng dịch vụ tệp broadcast.
 
 ## 2. Chức năng
 
@@ -42,10 +42,13 @@ Client ── TCP ── Server
 Tin nhắn và file riêng:
 Client A ── TCP ── Server ── TCP ── Client B
 
-Tin nhắn nhóm, JOIN, LEAVE, thông báo file:
+Tin nhắn nhóm, JOIN, LEAVE:
 Client A ── UDP multicast 230.0.0.1:5000 ── Các client đã tham gia
 
-Nội dung file nhóm:
+Thông báo tệp chung:
+Client gửi ── UDP broadcast <broadcast của LAN>:5001 ── Mọi client đang đăng nhập trong LAN
+
+Nội dung tệp chung:
 Client nhận ── TCP trực tiếp tới cổng tạm của client gửi ── Tải file
 ```
 
@@ -53,6 +56,7 @@ Client nhận ── TCP trực tiếp tới cổng tạm của client gửi ─
 |---|---|
 | TCP server | Cổng mặc định `2005`, thay đổi trên giao diện |
 | Nhóm multicast | Mặc định `230.0.0.1:5000`, TTL `32` |
+| Tệp broadcast | UDP `5001`, broadcast của card kết nối server; đổi bằng `-Dbroadcast.port=5001` trên mọi client |
 | Tin riêng | 1–8.000 ký tự, không được chỉ chứa khoảng trắng |
 | Tin nhóm | Toàn bộ gói UTF-8 tối đa `4.096 byte`, gồm cả header |
 | File riêng và nhóm | Tối đa `20 MiB` (20 × 1024 × 1024 byte), hỗ trợ file rỗng |
@@ -61,7 +65,7 @@ Client nhận ── TCP trực tiếp tới cổng tạm của client gửi ─
 
 TCP dùng khung nhị phân `CHT3`: độ dài khung, lgit add .oại lệnh, request ID, các trường chuỗi và dữ liệu file. Các lệnh client gửi là `LOGIN`, `SIGNUP`, `LIST`, `MESSAGE`, `FILE`; server trả `AUTHENTICATED`, `USERS`, `OK`, `ERROR` và chuyển tiếp `MESSAGE`/`FILE`. Đăng xuất đóng socket TCP. Client có luồng đọc riêng và timeout chờ phản hồi; server khóa luồng ghi của mỗi kết nối để tin nhắn và file không xen lẫn.
 
-UDP dùng gói văn bản `JOIN|username`, `LEAVE|username`, `MESSAGE|username|timestamp|content`. File nhóm được thông báo bằng `FILE_OFFER` chứa người gửi, token UUID, cổng TCP tạm, kích thước và tên file mã hóa Base64. Client đang tham gia tự tải và lưu file. Token có hiệu lực 10 phút; mỗi client giữ tối đa 32 file chia sẻ chưa hết hạn. Người gửi cần giữ file nguồn và tiếp tục ở trong phòng trong lúc người nhận tải.
+UDP multicast dùng `JOIN|username`, `LEAVE|username`, `MESSAGE|username|timestamp|content`. UDP broadcast dùng `FILE_OFFER` chứa người gửi, token UUID, cổng TCP tạm, kích thước và tên file mã hóa Base64. Mọi client đăng nhập trong cùng mạng broadcast tự tải và lưu tệp, dù chưa tham gia hoặc đã rời nhóm. Tệp hiển thị trong Phòng chung. Token có hiệu lực 10 phút; mỗi client giữ tối đa 32 file chia sẻ chưa hết hạn. Người gửi cần giữ file nguồn và tiếp tục đăng nhập trong lúc người nhận tải.
 
 ## 4. Cấu trúc mã nguồn
 
@@ -83,7 +87,8 @@ src/main/java/com/clientserverchat/
     core/Authentication.java         Kiểm tra form và thông báo lỗi
     core/ChatClient.java             Kết nối TCP, tin/file riêng
     core/ChatMessage.java            Sự kiện tin nhắn cho giao diện
-    core/MulticastChatService.java   Join/leave, tin nhóm và thông báo file
+    core/MulticastChatService.java   Join/leave và text nhóm
+    core/BroadcastFileService.java   Thông báo tệp cho mọi client đăng nhập trong LAN
     core/GroupFileTransfer.java      Chia sẻ và tải file nhóm qua TCP
     ui/ClientView.java               Giao diện login và chat
     ui/ClientController.java         Điều phối TCP, multicast và lịch sử chat
@@ -108,7 +113,7 @@ Các tên phương thức nghiệp vụ được Việt hóa không dấu để 
 | `thamGiaPhongMulticast(...)` | `client/core/MulticastChatService.java` | Join nhóm UDP multicast `230.0.0.1:5000` để chat phòng chung. |
 | `roiPhongMulticast()` | `client/core/MulticastChatService.java` | Rời nhóm multicast, đóng socket nhận tin nhóm. |
 | `guiTinNhanNhom(...)` | `client/core/MulticastChatService.java` | Gửi tin nhắn phòng chung bằng UDP multicast. |
-| `guiTepNhom(...)` | `client/core/MulticastChatService.java` | Phát thông báo file qua multicast, tải nội dung file bằng TCP trực tiếp giữa client. |
+| `guiTep(...)` | `client/core/BroadcastFileService.java` | Phát thông báo tệp qua broadcast cho cả trong/ngoài nhóm, tải nội dung bằng TCP trực tiếp. |
 | `kiemTraKetNoiServer()` | `client/ui/ClientController.java` | Nút **Kết nối** trên form login, chỉ kiểm tra IP/cổng TCP, chưa đăng nhập. |
 | `dangNhapHoacDangKi()` | `client/ui/ClientController.java` | Nút **Đăng nhập/Đăng ký**, kiểm tra form rồi gọi `dangNhap` hoặc `dangKi`. |
 | `khoiDongServer()` | `server/ui/ServerController.java` | Nút **Khởi động**, bind IP/cổng và bắt đầu nhận client TCP. |
@@ -178,7 +183,7 @@ Trong IntelliJ: Reload Maven, chọn Project SDK và Maven JRE là JDK 21+. Ch�
 java -jar server-client-chat-app.jar client
 ```
 
-Firewall cần cho phép TCP server (mặc định `2005`), UDP multicast (mặc định `5000`) và Java nhận kết nối TCP trên client gửi file nhóm. Cổng file nhóm được hệ điều hành chọn mỗi lần tham gia phòng, không cố định ở `2005`.
+Firewall cần cho phép TCP server (`2005`), UDP multicast (`5000`), UDP broadcast (`5001`) và Java nhận kết nối TCP trên client gửi tệp chung. Cổng tải tệp được hệ điều hành chọn khi đăng nhập. Máy thật và máy ảo cần cùng mạng broadcast (Bridged hoặc Host-only phù hợp); broadcast không đi qua router/NAT.
 
 Nếu có nhiều card mạng/VPN, chọn card bằng VM option trước `-jar`:
 
@@ -222,4 +227,4 @@ TCP có thể hoạt động dù multicast bị chặn bởi firewall, VPN, ch�
 
 JUnit kiểm tra framing/Unicode, đăng ký và mật khẩu, lưu/đọc tài khoản, IP/giờ vào/ra, đăng nhập trùng, tin riêng đồng thời, file hai chiều/file rỗng, người nhận offline, mất kết nối/reconnect, trạng thái form login, phản hồi nút Kết nối, multicast join/leave/rejoin, chống trùng và file nhóm.
 
-Các bài test multicast cần card mạng và firewall cho phép multicast. Test giao diện cần môi trường chạy được JavaFX.
+Các bài test multicast/broadcast cần card IPv4 và firewall cho phép UDP. Test tệp kiểm tra nhận trong/ngoài nhóm, nhận sau khi rời nhóm, nội dung byte, tệp rỗng và đóng dịch vụ khi đăng xuất. Test giao diện cần môi trường chạy được JavaFX.

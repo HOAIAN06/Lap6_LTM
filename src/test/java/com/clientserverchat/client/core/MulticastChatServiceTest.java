@@ -1,7 +1,7 @@
 /*
  * File: MulticastChatServiceTest.java
- * Vai trò: Test chức năng UDP multicast và file nhóm.
- * Mục đích: Kiểm tra join/leave phòng, gửi tin nhóm, chống trùng loopback và tải file nhóm.
+ * Vai trò: Test chức năng text UDP multicast.
+ * Mục đích: Kiểm tra join/leave phòng, gửi tin nhóm và chống trùng loopback.
  */
 package com.clientserverchat.client.core;
 
@@ -9,9 +9,6 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 
-import java.nio.file.*;
-import java.util.Random;
-import org.junit.jupiter.api.io.TempDir;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
@@ -22,7 +19,6 @@ import static org.junit.jupiter.api.Assertions.*;
 
 @Timeout(20)
 class MulticastChatServiceTest {
-    @TempDir Path directory;
     private static final String TEST_GROUP = "230.0.0.1";
     private static final int TEST_PORT = 5005;
 
@@ -46,37 +42,29 @@ class MulticastChatServiceTest {
         return svc;
     }
 
-    /** Kiểm tra file nhóm giữ nguyên byte, chỉ client đã tham gia phòng mới nhận được. */
+    /** Text chỉ đến thành viên; người ngoài nhóm không nhận được. */
     @Test
-    void groupFilesPreserveBytesAndOnlyReachJoinedClients() throws Exception {
+    void textOnlyReachesJoinedClients() throws Exception {
         MulticastChatService alice = createService(), bob = createService(), outsider = createService();
         BlockingQueue<ChatMessage> inbox = new LinkedBlockingQueue<>(), outside = new LinkedBlockingQueue<>();
         bob.setOnMessageReceived(inbox::add);
         outsider.setOnMessageReceived(outside::add);
-        byte[] bytes = new byte[1024 * 1024];
-        new Random(42).nextBytes(bytes);
-        Path source = Files.write(directory.resolve("tài-liệu.bin"), bytes);
-        assertThrows(java.io.IOException.class, () -> outsider.guiTepNhom(source.toFile()));
+        assertThrows(java.io.IOException.class, () -> outsider.guiTinNhanNhom("Không ở trong nhóm"));
         bob.thamGiaPhongMulticast("FileTestBob"); alice.thamGiaPhongMulticast("FileTestAlice");
-        alice.guiTepNhom(source.toFile());
+        alice.guiTinNhanNhom("Chỉ thành viên nhận text");
         ChatMessage message = inbox.poll(5, TimeUnit.SECONDS);
         assertNotNull(message);
-        assertTrue(message.file());
-        Path saved = Path.of(message.content().split("\nĐã lưu: ", 2)[1]);
-        try { assertArrayEquals(bytes, Files.readAllBytes(saved)); }
-        finally { Files.deleteIfExists(saved); }
+        assertFalse(message.file());
+        assertEquals("Chỉ thành viên nhận text", message.content());
         assertNull(outside.poll(100, TimeUnit.MILLISECONDS));
         bob.roiPhongMulticast();
-        alice.guiTepNhom(source.toFile());
+        alice.guiTinNhanNhom("Sau khi rời phòng");
         assertNull(inbox.poll(200, TimeUnit.MILLISECONDS));
         bob.thamGiaPhongMulticast("FileTestBob");
-        Path empty = Files.createFile(directory.resolve("empty.txt"));
-        alice.guiTepNhom(empty.toFile());
+        alice.guiTinNhanNhom("Tham gia lại");
         message = inbox.poll(5, TimeUnit.SECONDS);
         assertNotNull(message);
-        saved = Path.of(message.content().split("\nĐã lưu: ", 2)[1]);
-        try { assertEquals(0, Files.size(saved)); }
-        finally { Files.deleteIfExists(saved); }
+        assertEquals("Tham gia lại", message.content());
     }
 
     /** Kiểm tra trạng thái tham gia/rời phòng multicast cơ bản. */

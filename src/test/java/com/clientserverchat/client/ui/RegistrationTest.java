@@ -122,7 +122,8 @@ class RegistrationTest {
             assertEquals("○ Chưa tham gia", view.roomStatus.getText());
             assertEquals("Tham gia phòng", view.groupAction.getText());
             assertTrue(view.send.isDisabled());
-            assertTrue(view.attach.isDisabled());
+            assertFalse(view.attach.isDisabled());
+            assertEquals("📎  Tệp cho tất cả", view.attach.getText());
         });
         assertEquals(1, registry.danhSachNguoiDung().size());
         assertTrue(registry.danhSachNguoiDung().getFirst().online());

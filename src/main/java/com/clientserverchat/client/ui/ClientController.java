@@ -14,6 +14,7 @@ import com.clientserverchat.client.core.ChatClient;
 import com.clientserverchat.client.core.ChatMessage;
 import com.clientserverchat.client.core.Authentication;
 import com.clientserverchat.client.core.MulticastChatService;
+import com.clientserverchat.client.core.BroadcastFileService;
 import javafx.application.Platform;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.TransferMode;
@@ -28,6 +29,8 @@ public final class ClientController implements AutoCloseable {
     private final ChatClient client;
     private final ClientView view;
     private final MulticastChatService multicastService = new MulticastChatService();
+    private BroadcastFileService broadcastFiles;
+    private long fileSession;
     private final Map<String, List<ChatMessage>> conversations = new HashMap<>();
     private final Map<String, String> drafts = new HashMap<>();
     private List<String> online = List.of();
@@ -58,11 +61,23 @@ public final class ClientController implements AutoCloseable {
                 view.showChat(loginName, serverAddress);
                 if (registered) view.showNotice("Đăng ký thành công! Chào mừng " + loginName + ".");
             } else {
+                dongTepBroadcast();
                 multicastService.roiPhongMulticast();
                 joining = false;
                 sending = false;
                 view.showLogin();
                 view.loginError.setText("Đã ngắt kết nối. Bạn có thể đăng nhập lại.");
+            }
+            if (value) {
+                dongTepBroadcast();
+                long session = fileSession;
+                try {
+                    broadcastFiles = new BroadcastFileService(loginName, client.layDiaChiMayClient(),
+                            item -> Platform.runLater(() -> { if (connected && fileSession == session) nhanTepBroadcast(item); }),
+                            error -> Platform.runLater(() -> { if (connected && fileSession == session) view.showNotice(error); }));
+                } catch (IOException | IllegalArgumentException e) {
+                    view.showNotice("Không bật được nhận tệp broadcast: " + e.getMessage());
+                }
             }
             update();
         }));
@@ -109,6 +124,7 @@ public final class ClientController implements AutoCloseable {
         });
         view.confirmPassword.setOnAction(event -> dangNhapHoacDangKi());
         view.disconnect.setOnAction(event -> {
+            dongTepBroadcast();
             multicastService.roiPhongMulticast();
             client.dangXuat();
         });
@@ -201,15 +217,32 @@ public final class ClientController implements AutoCloseable {
         });
     }
 
-    /** Gửi file tới người đang chọn: file riêng qua TCP server, file nhóm qua multicast offer. */
+    private void dongTepBroadcast() {
+        fileSession++;
+        if (broadcastFiles != null) { broadcastFiles.close(); broadcastFiles = null; }
+    }
+
+    private void nhanTepBroadcast(ChatMessage item) {
+        List<ChatMessage> history = conversations.computeIfAbsent(ChatMessage.GROUP, ignored -> new ArrayList<>());
+        history.add(item);
+        if (history.size() > 500) history.removeFirst();
+        if (Objects.equals(active, ChatMessage.GROUP)) render();
+        if (!item.outgoing()) view.showNotice("Đã nhận tệp từ " + item.sender() + ". Mở Phòng chung để xem tệp.");
+    }
+
+    /** File chung phát broadcast cho mọi client; file riêng gửi qua TCP server. */
     private void guiTep(File file) {
         if (file == null || active == null || view.attach.isDisabled()) return;
         sending = true;
         String destination = active;
+        BroadcastFileService fileService = broadcastFiles;
         update();
         CompletableFuture<Void> operation = ChatMessage.GROUP.equals(destination)
                 ? CompletableFuture.runAsync(() -> {
-                    try { multicastService.guiTepNhom(file); }
+                    try {
+                        if (fileService == null) throw new IOException("Dịch vụ tệp broadcast chưa sẵn sàng.");
+                        fileService.guiTep(file);
+                    }
                     catch (IOException e) { throw new java.util.concurrent.CompletionException(e); }
                 }) : client.guiTep(destination, file);
         operation.whenComplete((unused, error) -> Platform.runLater(() -> {
@@ -322,7 +355,9 @@ public final class ClientController implements AutoCloseable {
         view.groupAction.setDisable(!connected || joining);
         view.leaveGroupHeader.setDisable(!connected || joining);
         view.send.setDisable(!available || sending);
-        view.attach.setDisable(!available || sending);
+        view.attach.setDisable(sending || !connected || active == null
+                || (isGroup ? broadcastFiles == null : !online.contains(active)));
+        view.attach.setText(isGroup ? "📎  Tệp cho tất cả" : "📎  Tệp");
         view.message.setDisable(!available || sending);
         view.refresh.setDisable(!connected);
 
@@ -391,6 +426,7 @@ public final class ClientController implements AutoCloseable {
 
     /** Đóng controller: rời multicast và đóng TCP client. */
     @Override public void close() {
+        dongTepBroadcast();
         multicastService.close();
         client.close();
     }

@@ -1,10 +1,10 @@
 /*
  * File: MulticastChatService.java
  * Vai trò: Tầng mạng UDP multicast của client.
- * Mục đích: Cho phép client tham gia/rời phòng chung, gửi/nhận tin nhắn nhóm và phát thông báo file nhóm.
+ * Mục đích: Cho phép client tham gia/rời phòng chung, gửi/nhận tin nhắn text nhóm.
  * Phương thức chính:
  * - thamGiaPhongMulticast()/roiPhongMulticast(): quản lý vòng đời MulticastSocket.
- * - guiTinNhanNhom()/guiTepNhom(): gửi tin hoặc file vào phòng chung.
+ * - guiTinNhanNhom(): gửi text vào phòng chung. Tệp do BroadcastFileService xử lý.
  * - langNgheMulticast()/xuLyGoiTinMulticast(): nhận và xử lý gói UDP.
  * - chonCardMang(): chọn NetworkInterface phù hợp trong LAN/máy ảo.
  */
@@ -42,7 +42,6 @@ public final class MulticastChatService implements AutoCloseable {
     private volatile Thread receiverThread;
     private volatile String currentUsername;
     private volatile boolean joined;
-    private volatile GroupFileTransfer files;
 
     // Cache ngăn hiển thị trùng tin nhắn do chính mình gửi khi nhận lại qua multicast loopback
     private final Set<String> sentMessageSignatures = Collections.newSetFromMap(new ConcurrentHashMap<>());
@@ -147,7 +146,6 @@ public final class MulticastChatService implements AutoCloseable {
                 socket.joinGroup(groupSocketAddress, null);
             }
 
-            files = new GroupFileTransfer(currentUsername, item -> onMessageReceived.accept(item), error -> onError.accept(error));
             joined = true;
             onGroupStateChanged.accept(true);
 
@@ -216,14 +214,6 @@ public final class MulticastChatService implements AutoCloseable {
         }
     }
 
-    /** Gửi file vào phòng nhóm: phát FILE_OFFER qua UDP, nội dung file tải bằng TCP trực tiếp. */
-    public synchronized void guiTepNhom(java.io.File file) throws IOException {
-        if (!joined || files == null || socket == null) throw new IOException("Tham gia phòng trước khi gửi tệp.");
-        byte[] payload = files.taoThongBaoChiaSe(file).getBytes(StandardCharsets.UTF_8);
-        socket.send(new DatagramPacket(payload, payload.length, groupSocketAddress));
-        onMessageReceived.accept(new ChatMessage(ChatMessage.GROUP, currentUsername, file.getName(), Instant.now(), true, true));
-    }
-
     /**
      * Gửi sự kiện JOIN|username vào nhóm.
      */
@@ -252,7 +242,6 @@ public final class MulticastChatService implements AutoCloseable {
     public synchronized void roiPhongMulticast() {
         if (!joined) return;
         joined = false;
-        if (files != null) { files.close(); files = null; }
         onGroupStateChanged.accept(false);
 
         // 1. Gửi thông báo LEAVE|username tới nhóm
@@ -293,9 +282,8 @@ public final class MulticastChatService implements AutoCloseable {
         receivedMessageSignatures.clear();
     }
 
-    /** Đóng socket multicast và dịch vụ file nhóm, bỏ qua lỗi lúc đang dọn tài nguyên. */
+    /** Đóng socket multicast, bỏ qua lỗi lúc đang dọn tài nguyên. */
     private void closeSocketQuietly() {
-        if (files != null) { files.close(); files = null; }
         if (socket != null) {
             try {
                 socket.close();
@@ -321,10 +309,7 @@ public final class MulticastChatService implements AutoCloseable {
                         packet.getLength(),
                         StandardCharsets.UTF_8
                 );
-                if (payload.startsWith("FILE_OFFER|")) {
-                    GroupFileTransfer transfer = files;
-                    if (transfer != null) transfer.nhanThongBaoChiaSe(payload, packet.getAddress());
-                } else xuLyGoiTinMulticast(payload);
+                xuLyGoiTinMulticast(payload);
 
             } catch (SocketException e) {
                 // Socket đã được đóng an toàn khi rời nhóm hoặc thoát ứng dụng

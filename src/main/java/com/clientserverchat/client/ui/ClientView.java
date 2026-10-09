@@ -468,7 +468,7 @@ public final class ClientView extends BorderPane {
     void configureHeader(boolean isGroup, boolean isJoined, String activeName) {
         if (isGroup) {
             roomTitle.setText("#  Phòng chung");
-            message.setPromptText(isJoined ? "Nhắn vào phòng chung..." : "Tham gia phòng để gửi và nhận tin nhắn");
+            message.setPromptText(isJoined ? "Nhắn vào phòng chung..." : "Tham gia để chat text; vẫn nhận và gửi tệp cho tất cả");
             roomStatus.setText(isJoined ? "● Đã tham gia" : "○ Chưa tham gia");
             roomStatus.getStyleClass().setAll(isJoined ? "badge-online" : "badge-neutral");
             roomStatus.setVisible(true);

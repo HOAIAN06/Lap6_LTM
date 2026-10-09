@@ -197,26 +197,27 @@ sequenceDiagram
     Mcast->>Group: MESSAGE|username|timestamp|content
 ```
 
-## 7. Gui file nhom: UDP offer + TCP noi dung
+## 7. Gui tep cho tat ca: UDP broadcast offer + TCP noi dung
 
 ```mermaid
 sequenceDiagram
     actor Sender as Client gui
     participant Ctrl as ClientController
-    participant Mcast as MulticastChatService
+    participant Mcast as BroadcastFileService gui
     participant FileSender as GroupFileTransfer gui
-    participant Group as Multicast group
+    participant Group as LAN broadcast UDP 5001
     participant ReceiverMcast as GroupFileTransfer nhan
     participant ReceiverFile as GroupFileTransfer taiTep
     participant Receiver as Client nhan
 
-    Sender->>Ctrl: Chon file trong phong nhom
-    Ctrl->>Mcast: guiTepNhom(file)
+    Note over Ctrl,Receiver: Bat nghe broadcast tu luc dang nhap, khong can tham gia nhom
+    Sender->>Ctrl: Chon Tep cho tat ca trong Phong chung
+    Ctrl->>Mcast: guiTep(file)
     Mcast->>FileSender: taoThongBaoChiaSe(file)
     FileSender->>FileSender: tao token, luu Shared va mo listener port tam
     FileSender-->>Mcast: FILE_OFFER|sender|token|port|size|name
-    Mcast->>Group: gui FILE_OFFER qua UDP
-    Group-->>ReceiverMcast: DatagramPacket
+    Mcast->>Group: gui FILE_OFFER qua UDP broadcast
+    Group-->>ReceiverMcast: DatagramPacket (ca trong va ngoai nhom)
     ReceiverMcast->>ReceiverMcast: nhanThongBaoChiaSe(payload, senderAddress)
     ReceiverMcast->>ReceiverFile: taiTep(address, port, token, ...)
     ReceiverFile->>FileSender: Socket.connect(address, port)
@@ -272,5 +273,5 @@ sequenceDiagram
 | File rieng | `ClientController.guiTep()` | `ChatClient`, `Session.xuLy()` | TCP | `FILE` + bytes |
 | Join phong nhom | `ClientController.thamGiaPhongMulticast()` | `MulticastChatService` | UDP multicast | `JOIN` |
 | Chat nhom | `ClientController.send()` | `MulticastChatService` | UDP multicast | `MESSAGE` |
-| File nhom | `ClientController.guiTep()` | `GroupFileTransfer` | UDP offer + TCP data | `FILE_OFFER` + token |
+| Tep cho tat ca | `ClientController.guiTep()` | `BroadcastFileService`, `GroupFileTransfer` | UDP broadcast + TCP data | `FILE_OFFER` + token |
 | Dung/thoat | `ServerController.dungServer()` / `ClientController.close()` | `close()`, `roiPhongMulticast()` | TCP + UDP | `LEAVE`, dong socket |
