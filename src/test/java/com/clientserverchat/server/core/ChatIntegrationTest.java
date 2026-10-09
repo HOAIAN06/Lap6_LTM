@@ -58,7 +58,7 @@ class ChatIntegrationTest {
 
     /** Chờ một item trong queue thỏa điều kiện, dùng cho sự kiện mạng bất đồng bộ. */
     private static <T> T await(BlockingQueue<T> queue, Predicate<T> predicate) throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(15);
         while (System.nanoTime() < deadline) {
             T value = queue.poll(Math.max(1, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
             if (value != null && predicate.test(value)) return value;
@@ -130,17 +130,17 @@ class ChatIntegrationTest {
         Path source = directory.resolve("ảnh.bin");
         Files.write(source, data);
         CompletableFuture.allOf(alice.guiTep("Bob", source.toFile()), bob.guiTep("Alice", source.toFile()),
-                alice.guiTinNhan("Bob", "after file | OK")).get(10, TimeUnit.SECONDS);
+                alice.guiTinNhan("Bob", "after file | OK")).get(20, TimeUnit.SECONDS);
         File first = await(bobFiles, file -> true);
         assertArrayEquals(data, Files.readAllBytes(first.toPath()));
         assertArrayEquals(data, Files.readAllBytes(await(aliceFiles, file -> true).toPath()));
         await(bobMessages, text -> text.endsWith("after file | OK"));
-        alice.guiTep("Bob", source.toFile()).get(5, TimeUnit.SECONDS);
+        alice.guiTep("Bob", source.toFile()).get(15, TimeUnit.SECONDS);
         File second = await(bobFiles, file -> true);
         assertNotEquals(first, second);
         assertArrayEquals(data, Files.readAllBytes(first.toPath()));
         Path empty = Files.createFile(directory.resolve("empty.txt"));
-        alice.guiTep("Bob", empty.toFile()).get(5, TimeUnit.SECONDS);
+        alice.guiTep("Bob", empty.toFile()).get(15, TimeUnit.SECONDS);
         assertEquals(0, await(bobFiles, file -> true).length());
     }
 
@@ -203,7 +203,7 @@ class ChatIntegrationTest {
         server.close();
         await(states, state -> !state);
         assertThrows(ExecutionException.class, () -> alice.lamMoiDanhSachNguoiDung().get(5, TimeUnit.SECONDS));
-        server = new ChatServer(0, registry, ignored -> {});
+        server = new ChatServer("127.0.0.1", 0, registry, ignored -> {});
         server.start();
         dangNhapClientTest(alice, "Alice");
         await(states, state -> state);

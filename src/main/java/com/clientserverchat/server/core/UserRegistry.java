@@ -20,6 +20,7 @@ import java.util.function.Consumer;
 /** Account persistence, password verification and latest connection metadata; no JavaFX dependency. */
 public final class UserRegistry {
     private final Path file;
+    private final Path usersDir;
     private final Map<String, Account> accounts = new TreeMap<>();
     private final Map<String, String> activeSessions = new HashMap<>();
     private Consumer<List<UserInfo>> onChange = ignored -> {};
@@ -30,20 +31,30 @@ public final class UserRegistry {
     /** Mở file tài khoản, đọc dữ liệu format=2; file format cũ sẽ được bỏ qua. */
     public UserRegistry(Path file) throws IOException {
         this.file = file.toAbsolutePath();
-        if (!Files.exists(this.file)) return;
-        Properties saved = new Properties();
-        try (InputStream input = Files.newInputStream(this.file)) { saved.load(input); }
-        try {
-            if (!"2".equals(saved.getProperty("format"))) return;
-            for (String key : saved.stringPropertyNames()) {
-                if (!key.endsWith(".password")) continue;
-                String name = Protocol.validName(key.substring(0, key.length() - 9));
-                String password = saved.getProperty(key, "");
-                kiemTraMatKhau(password);
-                accounts.put(name, new Account(password, saved.getProperty(name + ".ip", ""),
-                        parseTime(saved.getProperty(name + ".login", "")), parseTime(saved.getProperty(name + ".logout", ""))));
-            }
-        } catch (RuntimeException e) { throw new IOException("Không đọc được dữ liệu tài khoản", e); }
+        this.usersDir = this.file.getParent();
+        if (this.usersDir == null || !Files.exists(this.usersDir)) return;
+
+        // Read per-user directories: data/server/<username>/accounts.txt
+        try (var stream = Files.list(this.usersDir)) {
+            stream.filter(Files::isDirectory).forEach(dir -> {
+                Path accFile = dir.resolve("accounts.txt");
+                if (!Files.exists(accFile)) return;
+                Properties saved = new Properties();
+                try (InputStream input = Files.newInputStream(accFile)) {
+                    saved.load(input);
+                    String name = saved.getProperty("username", dir.getFileName().toString());
+                    name = Protocol.validName(name);
+                    String password = saved.getProperty("password", "");
+                    kiemTraMatKhau(password);
+                    String ip = saved.getProperty("ip", "");
+                    Instant login = parseTime(saved.getProperty("login", ""));
+                    Instant logout = parseTime(saved.getProperty("logout", ""));
+                    accounts.put(name, new Account(password, ip, login, logout));
+                } catch (IOException | RuntimeException e) {
+                    // skip malformed account file
+                }
+            });
+        }
     }
 
     /** Đăng ký callback để giao diện server tự cập nhật khi dữ liệu tài khoản thay đổi. */
@@ -114,23 +125,27 @@ public final class UserRegistry {
 
     /** Ghi toàn bộ tài khoản xuống file properties bằng file tạm rồi replace an toàn. */
     private void luu() throws IOException {
-        Files.createDirectories(file.getParent());
-        Properties saved = new Properties();
-        saved.setProperty("format", "2");
+        // Persist each account into its own directory: data/server/<username>/accounts.txt
+        if (usersDir == null) throw new IOException("Users directory is undefined");
+        Files.createDirectories(usersDir);
         for (var entry : accounts.entrySet()) {
             String name = entry.getKey();
             Account account = entry.getValue();
-            saved.setProperty(name + ".password", account.password);
-            saved.setProperty(name + ".ip", account.ip);
-            saved.setProperty(name + ".login", account.login == null ? "" : account.login.toString());
-            saved.setProperty(name + ".logout", account.logout == null ? "" : account.logout.toString());
+            Path dir = usersDir.resolve(name);
+            Files.createDirectories(dir);
+            Properties saved = new Properties();
+            saved.setProperty("username", name);
+            saved.setProperty("password", account.password);
+            saved.setProperty("ip", account.ip == null ? "" : account.ip);
+            saved.setProperty("login", account.login == null ? "" : account.login.toString());
+            saved.setProperty("logout", account.logout == null ? "" : account.logout.toString());
+            Path temporary = Files.createTempFile(dir, "accounts-", ".tmp");
+            try {
+                try (OutputStream output = Files.newOutputStream(temporary)) { saved.store(output, "Server-Client Chat account - plain text password"); }
+                try { Files.move(temporary, dir.resolve("accounts.txt"), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
+                catch (AtomicMoveNotSupportedException e) { Files.move(temporary, dir.resolve("accounts.txt"), StandardCopyOption.REPLACE_EXISTING); }
+            } finally { Files.deleteIfExists(temporary); }
         }
-        Path temporary = Files.createTempFile(file.getParent(), "accounts-", ".tmp");
-        try {
-            try (OutputStream output = Files.newOutputStream(temporary)) { saved.store(output, "Server-Client Chat accounts - plain text passwords for networking lab"); }
-            try { Files.move(temporary, file, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING); }
-            catch (AtomicMoveNotSupportedException e) { Files.move(temporary, file, StandardCopyOption.REPLACE_EXISTING); }
-        } finally { Files.deleteIfExists(temporary); }
     }
 
     /** Chuyển chuỗi thời gian ISO trong file dữ liệu thành Instant; chuỗi rỗng là null. */

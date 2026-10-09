@@ -21,13 +21,18 @@ class UserRegistryTest {
         UserRegistry registry = new UserRegistry(file);
         registry.dangKi("Alice", "Secret123!");
         registry.dangKi("Bob", "Secret123!");
-        String saved = Files.readString(file);
+        Path aliceFile = directory.resolve("Alice").resolve("accounts.txt");
+        Path bobFile = directory.resolve("Bob").resolve("accounts.txt");
+        String saved = Files.readString(aliceFile) + Files.readString(bobFile);
         assertFalse(saved.contains(".hash"));
         assertFalse(saved.contains(".salt"));
-        Properties values = new Properties();
-        try (var input = Files.newInputStream(file)) { values.load(input); }
-        assertEquals("Secret123!", values.getProperty("Alice.password"));
-        assertEquals("Secret123!", values.getProperty("Bob.password"));
+        Properties alice = new Properties(), bob = new Properties();
+        try (var input = Files.newInputStream(aliceFile)) { alice.load(input); }
+        try (var input = Files.newInputStream(bobFile)) { bob.load(input); }
+        assertEquals("Alice", alice.getProperty("username"));
+        assertEquals("Secret123!", alice.getProperty("password"));
+        assertEquals("Bob", bob.getProperty("username"));
+        assertEquals("Secret123!", bob.getProperty("password"));
         UserRegistry restored = new UserRegistry(file);
         restored.xacThuc("Alice", "Secret123!", false);
         assertThrows(IOException.class, () -> restored.xacThuc("Alice", "Wrong123!", false));
@@ -85,6 +90,11 @@ class UserRegistryTest {
         assertEquals("MậtKhẩu123!", restored.danhSachNguoiDung().getFirst().password());
         restored.xacThuc("Alice", "MậtKhẩu123!", false);
         assertEquals("MậtKhẩu123!", changes.getLast().getFirst().passwordDisplay());
-        assertTrue(Files.readString(file).contains("Alice.password="));
+        Properties saved = new Properties();
+        try (var input = Files.newInputStream(directory.resolve("Alice").resolve("accounts.txt"))) {
+            saved.load(input);
+        }
+        assertEquals("Alice", saved.getProperty("username"));
+        assertEquals("MậtKhẩu123!", saved.getProperty("password"));
     }
 }

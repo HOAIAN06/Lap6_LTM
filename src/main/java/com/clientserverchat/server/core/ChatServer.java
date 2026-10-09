@@ -31,11 +31,6 @@ public final class ChatServer implements AutoCloseable {
     private final UserRegistry users;
     private final Consumer<String> log;
 
-    // /** Tạo server nghe trên mọi IP của máy với cổng truyền vào. */
-    // public ChatServer(int port, UserRegistry users, Consumer<String> log) throws IOException {
-    //     this("0.0.0.0", port, users, log);
-    // }
-
     /** Tạo server nghe trên IP/cổng cụ thể và dùng UserRegistry để quản lý tài khoản. */
     public ChatServer(String ip, int port, UserRegistry users, Consumer<String> log) throws IOException {
         this.users = users;
